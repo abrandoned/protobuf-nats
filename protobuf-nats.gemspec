@@ -31,7 +31,9 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   #spec.add_runtime_dependency "ffi-nats-core"
-  spec.add_runtime_dependency "protobuf"
+  spec.add_runtime_dependency "protobuf", "3.7.0.pre3"
+  spec.add_runtime_dependency "connection_pool"
+  spec.add_runtime_dependency "nats-pure"
 
   spec.add_development_dependency "bundler", "~> 1.14"
   spec.add_development_dependency "rake", "~> 10.0"

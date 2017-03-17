@@ -1,6 +1,8 @@
 require "ostruct"
 require "thread"
 
+require "protobuf/nats"
+
 module Protobuf
   module Nats
     class Runner
