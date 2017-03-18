@@ -7,7 +7,7 @@ module Protobuf
         # may need to override to setup connection at this stage ... may also do on load of class
         super
 
-        Protobuf::Nats.ensure_client_pools_started
+        Protobuf::Nats.ensure_client_nats_connection_started
       end
 
       def close_connection
@@ -20,12 +20,11 @@ module Protobuf
 
       def send_request
         retries ||= 3
+
         setup_connection
-        Protobuf::Nats::Config.client_nats_pool.with do |nats|
-          @response_data = nil
-          nats_message = nats.request(subscription_key, @request_data, timeout: 60)
-          @response_data = nats_message.data
-        end
+        nats = Protobuf::Nats::Config.client_nats_connection
+        nats_message = nats.request(subscription_key, @request_data, timeout: 60)
+        @response_data = nats_message.data
         parse_response
       rescue ::Timeout::Error
         # Connection pool timeout getting a nats client.

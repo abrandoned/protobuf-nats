@@ -15,7 +15,7 @@ module Protobuf
   module Nats
     class Config
       class << self
-        attr_accessor :client_nats_pool
+        attr_accessor :client_nats_connection
       end
     end
 
@@ -23,18 +23,15 @@ module Protobuf
       {:servers => ["nats://127.0.0.1:4222"]}
     end
 
-    def self.start_client_pool
-      Config.client_nats_pool = ConnectionPool.new(size: 3, timeout: 2) do
-        client = ::NATS::IO::Client.new
-        client.connect(connection_options)
-        client
-      end
+    def self.start_client_nats_connection
+      Config.client_nats_connection = ::NATS::IO::Client.new
+      Config.client_nats_connection.connect(connection_options)
 
       true
     end
 
-    def self.ensure_client_pools_started
-      @ensure_client_pools_started ||= start_client_pool
+    def self.ensure_client_nats_connection_started
+      @ensure_client_nats_connection_started ||= start_client_nats_connection
     end
   end
 end
