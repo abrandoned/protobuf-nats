@@ -38,7 +38,12 @@ module Warehouse
   # Service Classes
   #
   class ShipmentService < ::Protobuf::Rpc::Service
+    rpc :create, ::Warehouse::Shipment, ::Warehouse::Shipment
     rpc :search, ::Warehouse::ShipmentRequest, ::Warehouse::Shipments
+
+    def create
+      respond_with request
+    end
 
     def search
       shipment = ::Warehouse::Shipment.new(:guid => SecureRandom.uuid, :address => "123 LAME ST", :price => 100.0, :package_guid => SecureRandom.uuid)
