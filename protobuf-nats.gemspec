@@ -33,6 +33,7 @@ Gem::Specification.new do |spec|
   #spec.add_runtime_dependency "ffi-nats-core"
   spec.add_runtime_dependency "protobuf", "3.7.0.pre3"
   spec.add_runtime_dependency "connection_pool"
+  spec.add_runtime_dependency "concurrent-ruby"
   spec.add_runtime_dependency "nats-pure"
 
   spec.add_development_dependency "bundler", "~> 1.14"

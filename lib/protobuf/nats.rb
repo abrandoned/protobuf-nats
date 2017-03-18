@@ -1,6 +1,9 @@
 require "protobuf/nats/version"
 
 require "protobuf"
+# We don't need this, but the CLI attempts to terminate.
+require "protobuf/rpc/service_directory"
+
 require "connection_pool"
 require "nats/io/client"
 
@@ -13,7 +16,6 @@ module Protobuf
     class Config
       class << self
         attr_accessor :client_nats_pool
-        attr_accessor :server_nats_pool
       end
     end
 
@@ -22,17 +24,7 @@ module Protobuf
     end
 
     def self.start_client_pool
-      Config.client_nats_pool = ConnectionPool.new(size: 50, timeout: 2) do
-        client = ::NATS::IO::Client.new
-        client.connect(connection_options)
-        client
-      end
-
-      true
-    end
-
-    def self.start_server_pool(size = 5)
-      Config.server_nats_pool = size.times.map do
+      Config.client_nats_pool = ConnectionPool.new(size: 3, timeout: 2) do
         client = ::NATS::IO::Client.new
         client.connect(connection_options)
         client
