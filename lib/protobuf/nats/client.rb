@@ -56,7 +56,7 @@ module Protobuf
         pb_response_condition = lock.new_cond
         response = nil
 
-        nats.subscribe(inbox, :max => 2) do |message|
+        sid = nats.subscribe(inbox, :max => 2) do |message|
           lock.synchronize do
             case message
             when ::Protobuf::Nats::Messages::ACK
@@ -83,6 +83,9 @@ module Protobuf
         end
 
         response
+      ensure
+        # Ensure we don't leave a subscription sitting around.
+        nats.unsubscribe(sid) if response.nil?
       end
 
       # This is a copy of #with_nats_timeout
