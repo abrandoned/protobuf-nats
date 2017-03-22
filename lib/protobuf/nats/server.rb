@@ -18,7 +18,9 @@ module Protobuf
 
         @nats = ::NATS::IO::Client.new
         @nats.connect(::Protobuf::Nats::Config.connection_options)
-        @thread_pool = ::Concurrent::FixedThreadPool.new(options[:threads])
+
+        # Don't let the queue grow beyond available threads.
+        @thread_pool = ::Concurrent::FixedThreadPool.new(options[:threads], :max_queue => -1)
 
         @subscriptions = []
       end
@@ -41,6 +43,10 @@ module Protobuf
             logger.error error.backtrace.join("\n")
           end
         end.execute
+
+        true
+      rescue ::Concurrent::RejectedExecutionError
+        false
       end
 
       def subscribe_to_services
@@ -55,7 +61,9 @@ module Protobuf
             logger.info "  - #{subscription_key_and_queue}"
 
             subscriptions << nats.subscribe(subscription_key_and_queue, :queue => subscription_key_and_queue) do |request_data, reply_id, _subject|
-              execute_request_promise(request_data, reply_id)
+              unless execute_request_promise(request_data, reply_id)
+                logger.error { "Thread pool is full! Dropping message for: #{subscription_key_and_queue}" }
+              end
             end
           end
         end
