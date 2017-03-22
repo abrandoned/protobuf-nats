@@ -21,10 +21,6 @@ module Protobuf
         request_options = {:timeout => 60, :ack_timeout => 5}
         @response_data = nats_request_with_two_responses(subscription_key, @request_data, request_options)
         parse_response
-      rescue ::Timeout::Error
-        # Connection pool timeout getting a nats client.
-        retry if (retries -= 1) > 0
-        raise
       rescue ::NATS::IO::Timeout
         # Nats response timeout.
         retry if (retries -= 1) > 0
