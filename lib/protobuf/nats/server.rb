@@ -1,5 +1,7 @@
-require "protobuf/rpc/server"
+require "active_support/core_ext/class/subclasses"
 require "concurrent"
+require "protobuf/rpc/server"
+require "protobuf/rpc/service"
 
 module Protobuf
   module Nats
@@ -8,10 +10,6 @@ module Protobuf
       include ::Protobuf::Logging
 
       attr_reader :nats, :thread_pool, :subscriptions
-
-      def self.service_klasses
-        ::ObjectSpace.each_object(::Class).select { |klass| klass < ::Protobuf::Rpc::Service }
-      end
 
       def initialize(options)
         @options = options
@@ -25,9 +23,8 @@ module Protobuf
         @subscriptions = []
       end
 
-
       def service_klasses
-        self.class.service_klasses
+        ::Protobuf::Rpc::Service.implemented_services.map(&:safe_constantize)
       end
 
       def execute_request_promise(request_data, reply_id)
