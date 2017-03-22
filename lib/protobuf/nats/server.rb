@@ -17,7 +17,7 @@ module Protobuf
         @stopped = false
 
         @nats = ::NATS::IO::Client.new
-        @nats.connect(::Protobuf::Nats.connection_options)
+        @nats.connect(::Protobuf::Nats::Config.connection_options)
         @thread_pool = ::Concurrent::FixedThreadPool.new(options[:threads])
 
         @subscriptions = []
@@ -29,7 +29,11 @@ module Protobuf
 
       def execute_request_promise(request_data, reply_id)
         ::Concurrent::Promise.new(:executor => thread_pool).then do
+          # Publish an ACK.
+          nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK)
+          # Process request.
           response_data = handle_request(request_data)
+          # Publish response.
           nats.publish(reply_id, response_data)
         end.on_error do |error|
           logger.error error
