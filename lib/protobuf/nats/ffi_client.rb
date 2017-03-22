@@ -1,8 +1,9 @@
+require "protobuf/nats"
 require "protobuf/rpc/connectors/base"
 
 module Protobuf
   module Nats
-    class Client < ::Protobuf::Rpc::Connectors::Base
+    class FfiClient < ::Protobuf::Rpc::Connectors::Base
       def initialize(options)
         # may need to override to setup connection at this stage ... may also do on load of class
         super

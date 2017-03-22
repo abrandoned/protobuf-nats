@@ -1,9 +1,10 @@
+require "protobuf/nats"
 require "protobuf/rpc/server"
 require "concurrent"
 
 module Protobuf
   module Nats
-    class Server
+    class FfiServer
       include ::Protobuf::Rpc::Server
       include ::Protobuf::Logging
 

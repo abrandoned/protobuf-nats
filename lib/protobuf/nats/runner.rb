@@ -19,7 +19,12 @@ module Protobuf
       end
 
       def run
-        @server = ::Protobuf::Nats::Server.new(@options)
+        if ::Protobuf::Nats.ffi?
+          @server = ::Protobuf::Nats::FfiServer.new(@options)
+        else
+          @server = ::Protobuf::Nats::Server.new(@options)
+        end
+
         register_signals
         @server.run do
           yield if block_given?

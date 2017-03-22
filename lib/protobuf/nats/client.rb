@@ -1,3 +1,4 @@
+require "protobuf/nats"
 require "protobuf/rpc/connectors/base"
 
 module Protobuf
