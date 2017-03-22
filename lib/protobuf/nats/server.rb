@@ -57,9 +57,7 @@ module Protobuf
             # Skip services that are not implemented.
             next unless service_klass.method_defined? service_method
 
-            service_class_name = service_klass.name.underscore.gsub("/", ".")
-            service_method_name = service_method.to_s.underscore
-            subscription_key_and_queue = "rpc.#{service_class_name}.#{service_method_name}"
+            subscription_key_and_queue = ::Protobuf::Nats.subscription_key(service_klass, service_method)
             logger.info "  - #{subscription_key_and_queue}"
 
             subscriptions << nats.subscribe(subscription_key_and_queue, :queue => subscription_key_and_queue) do |request_data, reply_id, _subject|

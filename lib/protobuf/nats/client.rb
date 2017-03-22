@@ -37,9 +37,7 @@ module Protobuf
 
         method_name_cache = self.class.subscription_key_cache[klass] ||= {}
         method_name_cache[method_name] ||= begin
-          service_class_name = klass.name.underscore.gsub("/", ".")
-          service_method_name = method_name.to_s.underscore
-          "rpc.#{service_class_name}.#{service_method_name}"
+          ::Protobuf::Nats.subscription_key(klass, method_name)
         end
       end
 
