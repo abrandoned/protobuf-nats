@@ -39,6 +39,7 @@ module Warehouse
   #
   class ShipmentService < ::Protobuf::Rpc::Service
     rpc :create, ::Warehouse::Shipment, ::Warehouse::Shipment
+    rpc :not_implemented, ::Warehouse::Shipment, ::Warehouse::Shipment
     rpc :search, ::Warehouse::ShipmentRequest, ::Warehouse::Shipments
 
     def create

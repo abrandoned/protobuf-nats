@@ -44,6 +44,9 @@ module Protobuf
 
         service_klasses.each do |service_klass|
           service_klass.rpcs.each do |service_name, _|
+            # Skip services that are not implemented.
+            next unless service_klass.method_defined? service_name
+
             subscription_key_and_queue = "#{service_klass}::#{service_name}"
             logger.info "  - #{subscription_key_and_queue}"
 
