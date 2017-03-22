@@ -53,11 +53,13 @@ module Protobuf
         logger.info "Creating subscriptions:"
 
         service_klasses.each do |service_klass|
-          service_klass.rpcs.each do |service_name, _|
+          service_klass.rpcs.each do |service_method, _|
             # Skip services that are not implemented.
-            next unless service_klass.method_defined? service_name
+            next unless service_klass.method_defined? service_method
 
-            subscription_key_and_queue = "#{service_klass}::#{service_name}"
+            service_class_name = service_klass.name.underscore.gsub("/", ".")
+            service_method_name = service_method.to_s.underscore
+            subscription_key_and_queue = "rpc.#{service_class_name}.#{service_method_name}"
             logger.info "  - #{subscription_key_and_queue}"
 
             subscriptions << nats.subscribe(subscription_key_and_queue, :queue => subscription_key_and_queue) do |request_data, reply_id, _subject|

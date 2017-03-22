@@ -14,12 +14,16 @@ module Protobuf
         # no-op (I think for now), the connection to server is persistent
       end
 
+      def self.subscription_key_cache
+        @subscription_key_cache ||= {}
+      end
+
       def send_request
         retries ||= 3
 
         setup_connection
         request_options = {:timeout => 60, :ack_timeout => 5}
-        @response_data = nats_request_with_two_responses(subscription_key, @request_data, request_options)
+        @response_data = nats_request_with_two_responses(cached_subscription_key, @request_data, request_options)
         parse_response
       rescue ::NATS::IO::Timeout
         # Nats response timeout.
@@ -27,8 +31,16 @@ module Protobuf
         raise
       end
 
-      def subscription_key
-        "#{@options[:service]}::#{@options[:method]}"
+      def cached_subscription_key
+        klass = @options[:service]
+        method_name = @options[:method]
+
+        method_name_cache = self.class.subscription_key_cache[klass] ||= {}
+        method_name_cache[method_name] ||= begin
+          service_class_name = klass.name.underscore.gsub("/", ".")
+          service_method_name = method_name.to_s.underscore
+          "rpc.#{service_class_name}.#{service_method_name}"
+        end
       end
 
     private
