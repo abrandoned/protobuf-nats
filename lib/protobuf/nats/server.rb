@@ -42,20 +42,32 @@ module Protobuf
         end.execute
       end
 
-      def subscribe_to_service(service_klass)
-        service_klass.rpcs.each do |service_name, _|
-          subscription_key_and_queue = "#{service_klass}::#{service_name}"
+      def subscribe_to_services
+        logger.info "Creating subscriptions:"
 
-          subscriptions << nats.subscribe(subscription_key_and_queue, :queue => subscription_key_and_queue) do |request_data, reply_id, _subject|
-            execute_request_promise(request_data, reply_id)
+        service_klasses.each do |service_klass|
+          service_klass.rpcs.each do |service_name, _|
+            subscription_key_and_queue = "#{service_klass}::#{service_name}"
+            logger.info "  - #{subscription_key_and_queue}"
+
+            subscriptions << nats.subscribe(subscription_key_and_queue, :queue => subscription_key_and_queue) do |request_data, reply_id, _subject|
+              execute_request_promise(request_data, reply_id)
+            end
           end
         end
       end
 
       def run
-        service_klasses.each do |service_klass|
-          subscribe_to_service(service_klass)
+        nats.on_reconnect do
+          logger.warn "Reconnected to NATS server!"
+          subscribe_to_services
         end
+
+        nats.on_disconnect do
+          logger.warn "Disconnected from NATS server!"
+        end
+
+        subscribe_to_services
 
         yield if block_given?
 
