@@ -72,7 +72,6 @@ module Protobuf
       def run
         nats.on_reconnect do
           logger.warn "Reconnected to NATS server!"
-          subscribe_to_services
         end
 
         nats.on_disconnect do
