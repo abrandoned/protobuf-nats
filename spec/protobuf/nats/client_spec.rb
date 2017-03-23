@@ -60,4 +60,12 @@ describe ::Protobuf::Nats::Client do
       expect { subject.nats_request_with_two_responses(msg_subject, "request data", options) }.to raise_error(::NATS::IO::Timeout)
     end
   end
+
+  describe "#send_request" do
+    it "retries 3 times when a NAT timeout is raised" do
+      expect(subject).to receive(:setup_connection).exactly(3).times
+      expect(subject).to receive(:nats_request_with_two_responses).and_raise(::NATS::IO::Timeout).exactly(3).times
+      expect { subject.send_request }.to raise_error(::NATS::IO::Timeout)
+    end
+  end
 end
