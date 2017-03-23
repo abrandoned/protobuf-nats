@@ -23,7 +23,7 @@ describe ::Protobuf::Nats::Client do
   end
 
   describe "#nats_request_with_two_responses" do
-    let(:client) { FakeNatsClient.new(:inbox => inbox) }
+    let(:client) { ::FakeNatsClient.new(:inbox => inbox) }
     let(:inbox) { "INBOX_123" }
     let(:msg_subject) { "rpc.yolo.brolo" }
     let(:ack) { ::Protobuf::Nats::Messages::ACK }
@@ -34,8 +34,8 @@ describe ::Protobuf::Nats::Client do
     end
 
     it "processes a request and return the final response" do
-      client.schedule_requests([FakeNatsClient::Request.new(inbox, ack, 0.05),
-                                FakeNatsClient::Request.new(inbox, response, 0.1)])
+      client.schedule_messages([::FakeNatsClient::Message.new(inbox, ack, 0.05),
+                                ::FakeNatsClient::Message.new(inbox, response, 0.1)])
 
       server_response = subject.nats_request_with_two_responses(msg_subject, "request data", {})
       expect(server_response).to eq(response)
@@ -47,14 +47,14 @@ describe ::Protobuf::Nats::Client do
     end
 
     it "does not signal an ack when messages are sent out of order" do
-      client.schedule_requests([FakeNatsClient::Request.new(inbox, response, 0.05)])
+      client.schedule_messages([::FakeNatsClient::Message.new(inbox, response, 0.05)])
 
       options = {:ack_timeout => 0.1}
       expect { subject.nats_request_with_two_responses(msg_subject, "request data", options) }.to raise_error(::NATS::IO::Timeout)
     end
 
     it "raises an error when the ack is signaled but pb response is not" do
-      client.schedule_requests([FakeNatsClient::Request.new(inbox, ack, 0.05)])
+      client.schedule_messages([::FakeNatsClient::Message.new(inbox, ack, 0.05)])
 
       options = {:timeout => 0.1}
       expect { subject.nats_request_with_two_responses(msg_subject, "request data", options) }.to raise_error(::NATS::IO::Timeout)

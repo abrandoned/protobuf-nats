@@ -2,7 +2,7 @@ require "securerandom"
 require "thread"
 
 class FakeNatsClient
-  Request = Struct.new(:subject, :data, :seconds_in_future)
+  Message = Struct.new(:subject, :data, :seconds_in_future)
 
   def initialize(options)
     @inbox = options[:inbox] || ::SecureRandom.uuid
@@ -23,17 +23,17 @@ class FakeNatsClient
   def unsubscribe(*)
   end
 
-  def schedule_request(request)
-    schedule_requests([request])
+  def schedule_message(message)
+    schedule_messages([message])
   end
 
-  def schedule_requests(requests)
-    requests.each do |request|
+  def schedule_messages(messages)
+    messages.each do |message|
       Thread.new do
         begin
-          sleep request.seconds_in_future
-          block = @subscriptions[request.subject]
-          block.call(request.data) if block
+          sleep message.seconds_in_future
+          block = @subscriptions[message.subject]
+          block.call(message.data) if block
         rescue => error
           puts error
         end
