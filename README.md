@@ -27,6 +27,19 @@ few params which cannot be set: `servers`, `uses_tls` and `connect_timeout`, so 
 The library will automatically look for a file with a relative path of `config/protobuf_nats.yml`, but you may override
 this by specifying a different file via the `PROTOBUF_NATS_CONFIG_PATH` env variable.
 
+An example config looks like this:
+```
+# Stored at config/protobuf_nats.yml
+---
+  production:
+    servers:
+      - "nats://127.0.0.1:4222"
+      - "nats://127.0.0.1:4223"
+      - "nats://127.0.0.1:4224"
+    uses_tls: true
+    connect_timeout: 2
+```
+
 ## Usage
 
 This library is designed to be an alternative transport implementation used by the `protobuf` gem. In order to make
