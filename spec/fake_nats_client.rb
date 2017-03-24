@@ -4,9 +4,14 @@ require "thread"
 class FakeNatsClient
   Message = Struct.new(:subject, :data, :seconds_in_future)
 
-  def initialize(options)
+  attr_reader :subscriptions
+
+  def initialize(options = {})
     @inbox = options[:inbox] || ::SecureRandom.uuid
     @subscriptions = {}
+  end
+
+  def connect(*)
   end
 
   def new_inbox
@@ -17,7 +22,7 @@ class FakeNatsClient
   end
 
   def subscribe(subject, args, &block)
-    @subscriptions[subject] = block
+    subscriptions[subject] = block
   end
 
   def unsubscribe(*)
@@ -32,7 +37,7 @@ class FakeNatsClient
       Thread.new do
         begin
           sleep message.seconds_in_future
-          block = @subscriptions[message.subject]
+          block = subscriptions[message.subject]
           block.call(message.data) if block
         rescue => error
           puts error
