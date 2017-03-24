@@ -13,3 +13,6 @@
 
   production:
     <<: *defaults
+
+  test:
+    <<: *defaults
