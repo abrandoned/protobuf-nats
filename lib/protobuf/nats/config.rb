@@ -14,6 +14,12 @@ module Protobuf
         :servers => nil
       }.freeze
 
+      def initialize
+        DEFAULTS.each_pair do |key, value|
+          __send__("#{key}=", value)
+        end
+      end
+
       def load_from_yml(reload = false)
         CONFIG_MUTEX.synchronize do
           @load_from_yml = nil if reload
@@ -55,6 +61,7 @@ module Protobuf
       def new_tls_context
         tls_context = ::OpenSSL::SSL::SSLContext.new
         tls_context.ssl_version = :TLSv1_2
+        tls_context
       end
 
     end
