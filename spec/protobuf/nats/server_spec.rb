@@ -32,7 +32,7 @@ describe ::Protobuf::Nats::Server do
   end
 
   describe "execute_request_promise" do
-    it "returns false when the thread pool is full" do
+    it "returns nil when the thread pool is full" do
       # Block the thread pool.
       2.times { subject.thread_pool << lambda { sleep 1 } }
       expect(subject.execute_request_promise("", "")).to eq(nil)
