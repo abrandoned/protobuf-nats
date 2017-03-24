@@ -1,0 +1,15 @@
+---
+  defaults: &defaults
+    # All other parameters should be set via env variables.
+    servers:
+      - "nats://127.0.0.1:4222"
+      - "nats://127.0.0.1:4223"
+      - "nats://127.0.0.1:4224"
+    uses_tls: true
+    connect_timeout: 2
+
+  development:
+    <<: *defaults
+
+  production:
+    <<: *defaults

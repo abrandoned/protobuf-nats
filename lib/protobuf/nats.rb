@@ -11,6 +11,7 @@ require "nats/io/client"
 require "protobuf/nats/client"
 require "protobuf/nats/server"
 require "protobuf/nats/runner"
+require "protobuf/nats/config"
 
 module Protobuf
   module Nats
@@ -22,11 +23,16 @@ module Protobuf
       ACK = "\1".freeze
     end
 
-    class Config
-      def self.connection_options
-        {:servers => ["nats://127.0.0.1:4222"]}
+    def self.config
+      @config ||= begin
+        config = ::Protobuf::Nats::Config.new
+        config.load_from_yml
+        config
       end
     end
+
+    # Eagerly load the yml config.
+    config
 
     def self.subscription_key(service_klass, service_method)
       service_class_name = service_klass.name.underscore.gsub("/", ".")
@@ -36,7 +42,7 @@ module Protobuf
 
     def self.start_client_nats_connection
       @client_nats_connection = ::NATS::IO::Client.new
-      @client_nats_connection.connect(Config.connection_options)
+      @client_nats_connection.connect(config.connection_options)
 
       # Ensure we have a valid connection to the NATS server.
       @client_nats_connection.flush(5)
