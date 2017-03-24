@@ -44,6 +44,8 @@ module Protobuf
       true
     end
 
-    start_client_nats_connection
+    def self.ensure_client_nats_connection_was_started
+      @ensure_client_nats_connection_was_started ||= start_client_nats_connection
+    end
   end
 end

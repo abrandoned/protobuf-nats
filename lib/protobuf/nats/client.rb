@@ -8,6 +8,8 @@ module Protobuf
       def initialize(options)
         # may need to override to setup connection at this stage ... may also do on load of class
         super
+
+        ::Protobuf::Nats.ensure_client_nats_connection_was_started
       end
 
       def close_connection
@@ -41,8 +43,6 @@ module Protobuf
         end
       end
 
-    private
-
       # This is a request that expects two responses.
       # 1. An ACK from the server. We use a shorter timeout.
       # 2. A PB message from the server. We use a longer timoeut.
@@ -53,7 +53,6 @@ module Protobuf
         ack_condition = lock.new_cond
         pb_response_condition = lock.new_cond
         response = nil
-
         sid = nats.subscribe(inbox, :max => 2) do |message|
           lock.synchronize do
             case message
