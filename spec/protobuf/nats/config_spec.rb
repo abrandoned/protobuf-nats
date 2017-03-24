@@ -33,7 +33,7 @@ describe ::Protobuf::Nats::Config do
     ENV["PROTOBUF_NATS_CONFIG_PATH"] = nil
   end
 
-  it "loads the defaulss when a yml config is missing" do
+  it "loads the defaults when a yml config is missing" do
     ENV["PROTOBUF_NATS_CONFIG_PATH"] = "spec/support/i_do_not_exist_because_im_not_real"
 
     subject.load_from_yml
