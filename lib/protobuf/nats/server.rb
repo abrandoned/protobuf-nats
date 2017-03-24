@@ -16,7 +16,7 @@ module Protobuf
         @running = true
         @stopped = false
 
-        @nats = ::NATS::IO::Client.new
+        @nats = options[:client] || ::NATS::IO::Client.new
         @nats.connect(::Protobuf::Nats::Config.connection_options)
 
         # Don't let the queue grow beyond available threads.
@@ -38,15 +38,13 @@ module Protobuf
           # Publish response.
           nats.publish(reply_id, response_data)
         end.on_error do |error|
-          logger.error error
+          logger.error error.to_s
           if error.respond_to?(:backtrace) && error.backtrace.is_a?(::Array)
             logger.error error.backtrace.join("\n")
           end
         end.execute
-
-        true
       rescue ::Concurrent::RejectedExecutionError
-        false
+        nil
       end
 
       def subscribe_to_services
