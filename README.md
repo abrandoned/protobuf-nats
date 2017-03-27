@@ -37,6 +37,8 @@ An example config looks like this:
       - "nats://127.0.0.1:4223"
       - "nats://127.0.0.1:4224"
     uses_tls: true
+    tls_client_cert: "/path/to/client-cert.pem"
+    tls_client_key: "/path/to/client-key.pem"
     connect_timeout: 2
 ```
 
