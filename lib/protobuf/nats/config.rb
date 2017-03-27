@@ -4,14 +4,16 @@ require "yaml"
 module Protobuf
   module Nats
     class Config
-      attr_accessor :uses_tls, :servers, :connect_timeout
+      attr_accessor :uses_tls, :servers, :connect_timeout, :tls_client_cert, :tls_client_key
 
       CONFIG_MUTEX = ::Mutex.new
 
       DEFAULTS = {
-        :uses_tls => false,
         :connect_timeout => nil,
-        :servers => nil
+        :servers => nil,
+        :tls_client_cert => nil,
+        :tls_client_key => nil,
+        :uses_tls => false,
       }.freeze
 
       def initialize
@@ -48,7 +50,7 @@ module Protobuf
 
       def connection_options(reload = false)
         @connection_options = false if reload
-        @connection_options || begin
+        @connection_options ||= begin
           options = {
             servers: servers,
             connect_timeout: connect_timeout
@@ -61,6 +63,8 @@ module Protobuf
       def new_tls_context
         tls_context = ::OpenSSL::SSL::SSLContext.new
         tls_context.ssl_version = :TLSv1_2
+        tls_context.cert = ::OpenSSL::X509::Certificate.new(::File.read(tls_client_cert)) if tls_client_cert
+        tls_context.key = ::OpenSSL::PKey::RSA.new(::File.read(tls_client_key)) if tls_client_key
         tls_context
       end
 
