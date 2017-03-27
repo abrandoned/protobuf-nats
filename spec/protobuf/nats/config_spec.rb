@@ -22,6 +22,26 @@ describe ::Protobuf::Nats::Config do
     expect(tls_context).to be_an(::OpenSSL::SSL::SSLContext)
   end
 
+  it "can load a custom cert into the ssl context" do
+    ENV["PROTOBUF_NATS_CONFIG_PATH"] = "spec/support/protobuf_nats.yml"
+
+    subject.load_from_yml
+    expected_cert = ::File.read("spec/support/certs/client-cert.pem")
+    expect(subject.new_tls_context.cert.to_s).to eq(expected_cert)
+
+    ENV["PROTOBUF_NATS_CONFIG_PATH"] = nil
+  end
+
+  it "can load a custom key into the ssl context" do
+    ENV["PROTOBUF_NATS_CONFIG_PATH"] = "spec/support/protobuf_nats.yml"
+
+    subject.load_from_yml
+    expected_key = ::File.read("spec/support/certs/client-key.pem")
+    expect(subject.new_tls_context.key.to_s).to eq(expected_key)
+
+    ENV["PROTOBUF_NATS_CONFIG_PATH"] = nil
+  end
+
   it "can load the yml from a specific directory" do
     ENV["PROTOBUF_NATS_CONFIG_PATH"] = "spec/support/protobuf_nats.yml"
 

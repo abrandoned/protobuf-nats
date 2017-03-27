@@ -6,6 +6,8 @@
       - "nats://127.0.0.1:4223"
       - "nats://127.0.0.1:4224"
     uses_tls: true
+    tls_client_cert: "./spec/support/certs/client-cert.pem"
+    tls_client_key: "./spec/support/certs/client-key.pem"
     connect_timeout: 2
 
   development:

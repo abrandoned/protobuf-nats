@@ -1,6 +1,7 @@
 require "bundler/setup"
 require "protobuf/nats"
 require "fake_nats_client"
+require "pry"
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
