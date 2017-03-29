@@ -31,7 +31,7 @@ describe ::Protobuf::Nats::Server do
     end
   end
 
-  describe "execute_request_promise" do
+  describe "#execute_request_promise" do
     it "returns nil when the thread pool and thread pool queue is full" do
       # Fill the thread pool.
       2.times { subject.thread_pool << lambda { sleep 1 } }

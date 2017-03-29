@@ -63,4 +63,30 @@ describe ::Protobuf::Nats::Config do
 
     ENV["PROTOBUF_NATS_CONFIG_PATH"] = nil
   end
+
+  describe "#ack_timeout_in_seconds" do
+    it "uses the default when no env is specified" do
+      expect(::Protobuf::Nats::Config::DEFAULT_ACK_TIMEOUT_IN_SECONDS).to eq(5.0)
+      expect(subject.ack_timeout_in_seconds).to eq(::Protobuf::Nats::Config::DEFAULT_ACK_TIMEOUT_IN_SECONDS)
+    end
+
+    it "can be set with an env variable" do
+      ENV["PB_NATS_ACK_TIMEOUT_IN_SECONDS"] = "0.5"
+      expect(subject.ack_timeout_in_seconds).to eq(0.5)
+      ENV.delete("PB_NATS_ACK_TIMEOUT_IN_SECONDS")
+    end
+  end
+
+  describe "#response_timeout_in_seconds" do
+    it "uses the default when no env is specified" do
+      expect(::Protobuf::Nats::Config::DEFAULT_RESPONSE_TIMEOUT_IN_SECONDS).to eq(60.0)
+      expect(subject.response_timeout_in_seconds).to eq(::Protobuf::Nats::Config::DEFAULT_RESPONSE_TIMEOUT_IN_SECONDS)
+    end
+
+    it "can be set with an env variable" do
+      ENV["PB_NATS_RESPONSE_TIMEOUT_IN_SECONDS"] = "1.5"
+      expect(subject.response_timeout_in_seconds).to eq(1.5)
+      ENV.delete("PB_NATS_RESPONSE_TIMEOUT_IN_SECONDS")
+    end
+  end
 end

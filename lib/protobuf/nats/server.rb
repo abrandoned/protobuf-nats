@@ -27,8 +27,19 @@ module Protobuf
         ::Protobuf::Rpc::Service.implemented_services.map(&:safe_constantize)
       end
 
+      def stale_work_timeout_in_seconds
+        ::Protobuf::Nats.config.ack_timeout_in_seconds
+      end
+
       def execute_request_promise(request_data, reply_id)
+        enqueued_at = ::Concurrent.monotonic_time
+
         ::Concurrent::Promise.new(:executor => thread_pool).then do
+          if (::Concurrent.monotonic_time - enqueued_at) >= stale_work_timeout_in_seconds
+            logger.error "Request older than #{stale_work_timeout_in_seconds} seconds. Dropping request from inbox #{reply_id}!"
+            next
+          end
+
           # Publish an ACK.
           nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK)
           # Process request.
@@ -73,6 +84,8 @@ module Protobuf
         nats.on_disconnect do
           logger.warn "Disconnected from NATS server!"
         end
+
+        logger.info "Requests not picked up within #{stale_work_timeout_in_seconds} seconds will be dropped. This can be set via the PB_NATS_ACK_TIMEOUT_IN_SECONDS env variable."
 
         subscribe_to_services
 

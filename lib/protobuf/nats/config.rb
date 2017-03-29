@@ -16,10 +16,21 @@ module Protobuf
         :uses_tls => false,
       }.freeze
 
+      DEFAULT_ACK_TIMEOUT_IN_SECONDS = 5.0
+      DEFAULT_RESPONSE_TIMEOUT_IN_SECONDS = 60.0
+
       def initialize
         DEFAULTS.each_pair do |key, value|
           __send__("#{key}=", value)
         end
+      end
+
+      def ack_timeout_in_seconds
+        @ack_timeout_in_seconds ||= ENV.fetch("PB_NATS_ACK_TIMEOUT_IN_SECONDS", DEFAULT_ACK_TIMEOUT_IN_SECONDS).to_f
+      end
+
+      def response_timeout_in_seconds
+        @response_timeout_in_seconds ||= ENV.fetch("PB_NATS_RESPONSE_TIMEOUT_IN_SECONDS", DEFAULT_RESPONSE_TIMEOUT_IN_SECONDS).to_f
       end
 
       def load_from_yml(reload = false)

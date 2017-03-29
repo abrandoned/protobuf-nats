@@ -24,8 +24,7 @@ module Protobuf
         retries ||= 3
 
         setup_connection
-        request_options = {:timeout => 60, :ack_timeout => 5}
-        @response_data = nats_request_with_two_responses(cached_subscription_key, @request_data, request_options)
+        @response_data = nats_request_with_two_responses(cached_subscription_key, @request_data)
         parse_response
       rescue ::NATS::IO::Timeout
         # Nats response timeout.
@@ -46,7 +45,7 @@ module Protobuf
       # This is a request that expects two responses.
       # 1. An ACK from the server. We use a shorter timeout.
       # 2. A PB message from the server. We use a longer timoeut.
-      def nats_request_with_two_responses(subject, data, opts)
+      def nats_request_with_two_responses(subject, data, opts = {})
         nats = Protobuf::Nats.client_nats_connection
         inbox = nats.new_inbox
         lock = ::Monitor.new
@@ -71,11 +70,11 @@ module Protobuf
           nats.publish(subject, data, inbox)
 
           # Wait for the ACK from the server
-          ack_timeout = opts[:ack_timeout] || 5
+          ack_timeout = opts[:ack_timeout] || ::Protobuf::Nats.config.ack_timeout_in_seconds
           with_timeout(ack_timeout) { ack_condition.wait(ack_timeout) }
 
           # Wait for the protobuf response
-          timeout = opts[:timeout] || 60
+          timeout = opts[:timeout] || ::Protobuf::Nats.config.response_timeout_in_seconds
           with_timeout(timeout) { pb_response_condition.wait(timeout) } unless response
         end
 
