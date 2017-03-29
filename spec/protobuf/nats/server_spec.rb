@@ -40,6 +40,15 @@ describe ::Protobuf::Nats::Server do
       expect(subject.execute_request_promise("", "")).to eq(nil)
     end
 
+    it "sends an ACK if the thread pool enqueued the task" do
+      # Fill the thread pool.
+      2.times { subject.thread_pool << lambda { sleep 1 } }
+      expect(subject.nats).to receive(:publish).with("inbox_123", ::Protobuf::Nats::Messages::ACK)
+      # Wait for promise to finish executing.
+      promise = subject.execute_request_promise("", "inbox_123")
+      subject.thread_pool.kill
+    end
+
     it "logs any error that is raised within the request promise chain" do
       request_data = "yolo"
       expect(subject).to receive(:handle_request).with(request_data).and_raise(::RuntimeError)
