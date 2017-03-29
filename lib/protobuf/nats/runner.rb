@@ -6,6 +6,7 @@ require "protobuf/nats"
 module Protobuf
   module Nats
     class Runner
+      include ::Protobuf::Logging
 
       def initialize(options)
         @options = case
