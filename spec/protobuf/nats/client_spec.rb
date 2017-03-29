@@ -42,15 +42,18 @@ describe ::Protobuf::Nats::Client do
     end
 
     it "raises an error when the ack is not signaled" do
-      options = {:ack_timeout => 0.05}
-      expect { subject.nats_request_with_two_responses(msg_subject, "request data", options) }.to raise_error(::NATS::IO::Timeout)
-    end
-
-    it "does not signal an ack when messages are sent out of order" do
       client.schedule_messages([::FakeNatsClient::Message.new(inbox, response, 0.05)])
 
       options = {:ack_timeout => 0.1}
       expect { subject.nats_request_with_two_responses(msg_subject, "request data", options) }.to raise_error(::NATS::IO::Timeout)
+    end
+
+    it "can send messages out of order and still complete" do
+      client.schedule_messages([::FakeNatsClient::Message.new(inbox, response, 0.05),
+                                ::FakeNatsClient::Message.new(inbox, ack, 0.1)])
+
+      server_response = subject.nats_request_with_two_responses(msg_subject, "request data", {})
+      expect(server_response).to eq(response)
     end
 
     it "raises an error when the ack is signaled but pb response is not" do
