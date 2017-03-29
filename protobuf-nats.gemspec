@@ -31,7 +31,6 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   spec.add_runtime_dependency "protobuf", "~> 3.7"
-  spec.add_runtime_dependency "connection_pool"
   spec.add_runtime_dependency "concurrent-ruby"
   spec.add_runtime_dependency "nats-pure"
 
