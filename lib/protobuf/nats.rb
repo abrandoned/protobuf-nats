@@ -5,6 +5,7 @@ require "protobuf"
 require "protobuf/rpc/service_directory"
 
 require "connection_pool"
+require "concurrent"
 
 require "nats/io/client"
 

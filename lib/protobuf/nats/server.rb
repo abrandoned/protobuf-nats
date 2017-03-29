@@ -1,5 +1,4 @@
 require "active_support/core_ext/class/subclasses"
-require "protobuf/nats/fixed_thread_pool_with_no_queue"
 require "protobuf/rpc/server"
 require "protobuf/rpc/service"
 
@@ -19,7 +18,7 @@ module Protobuf
         @nats = options[:client] || ::NATS::IO::Client.new
         @nats.connect(::Protobuf::Nats.config.connection_options)
 
-        @thread_pool = ::Protobuf::Nats::FixedThreadPoolWithNoQueue.new(options[:threads])
+        @thread_pool = ::Concurrent::FixedThreadPool.new(options[:threads], :max_queue => options[:threads])
 
         @subscriptions = []
       end
