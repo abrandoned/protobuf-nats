@@ -98,12 +98,14 @@ module Protobuf
           sleep 1
         end
 
+        logger.info "Unsubscribing from rpc routes..."
         subscriptions.each do |subscription_id|
           nats.unsubscribe(subscription_id)
         end
 
+        logger.info "Waiting up to 60 seconds for the thread pool to finish shutting down..."
         thread_pool.shutdown
-        thread_pool.wait_for_termination
+        thread_pool.wait_for_termination(60)
       ensure
         @stopped = true
       end
