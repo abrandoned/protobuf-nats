@@ -22,6 +22,8 @@ module Protobuf
       ACK = "\1".freeze
     end
 
+    GET_CONNECTED_MUTEX = ::Mutex.new
+
     def self.config
       @config ||= begin
         config = ::Protobuf::Nats::Config.new
@@ -40,17 +42,20 @@ module Protobuf
     end
 
     def self.start_client_nats_connection
-      @client_nats_connection = ::NATS::IO::Client.new
-      @client_nats_connection.connect(config.connection_options)
+      @start_client_nats_connection ||= begin
+        GET_CONNECTED_MUTEX.synchronize do
+          return if @start_client_nats_connection
 
-      # Ensure we have a valid connection to the NATS server.
-      @client_nats_connection.flush(5)
+          @client_nats_connection = ::NATS::IO::Client.new
+          @client_nats_connection.connect(config.connection_options)
 
-      true
+          # Ensure we have a valid connection to the NATS server.
+          @client_nats_connection.flush(5)
+
+          true
+        end
+      end
     end
 
-    def self.ensure_client_nats_connection_was_started
-      @ensure_client_nats_connection_was_started ||= start_client_nats_connection
-    end
   end
 end

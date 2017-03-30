@@ -14,6 +14,6 @@ RSpec.configure do |config|
   end
 
   config.before(:each) do
-    allow(Protobuf::Nats).to receive(:ensure_client_nats_connection_was_started)
+    allow(Protobuf::Nats).to receive(:start_client_nats_connection)
   end
 end

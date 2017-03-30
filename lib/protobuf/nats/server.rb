@@ -34,10 +34,7 @@ module Protobuf
           # Publish response.
           nats.publish(reply_id, response_data)
         end.on_error do |error|
-          logger.error error.to_s
-          if error.respond_to?(:backtrace) && error.backtrace.is_a?(::Array)
-            logger.error error.backtrace.join("\n")
-          end
+          log_error(error)
         end.execute
 
         # Publish an ACK to signal the server has picked up the work.
@@ -46,6 +43,13 @@ module Protobuf
         promise
       rescue ::Concurrent::RejectedExecutionError
         nil
+      end
+
+      def log_error(error)
+        logger.error error.to_s
+        if error.respond_to?(:backtrace) && error.backtrace.is_a?(::Array)
+          logger.error error.backtrace.join("\n")
+        end
       end
 
       def subscribe_to_services
@@ -77,6 +81,14 @@ module Protobuf
           logger.warn "Disconnected from NATS server!"
         end
 
+        nats.on_error do |error|
+          log_error(error)
+        end
+
+        nats.on_close do
+          logger.warn "NATS connection was closed!"
+        end
+
         subscribe_to_services
 
         yield if block_given?
@@ -86,12 +98,14 @@ module Protobuf
           sleep 1
         end
 
+        logger.info "Unsubscribing from rpc routes..."
         subscriptions.each do |subscription_id|
           nats.unsubscribe(subscription_id)
         end
 
+        logger.info "Waiting up to 60 seconds for the thread pool to finish shutting down..."
         thread_pool.shutdown
-        thread_pool.wait_for_termination
+        thread_pool.wait_for_termination(60)
       ensure
         @stopped = true
       end
