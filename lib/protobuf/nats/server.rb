@@ -1,5 +1,4 @@
 require "active_support/core_ext/class/subclasses"
-require "protobuf/nats/fixed_thread_pool_with_no_queue"
 require "protobuf/rpc/server"
 require "protobuf/rpc/service"
 
@@ -19,7 +18,7 @@ module Protobuf
         @nats = options[:client] || ::NATS::IO::Client.new
         @nats.connect(::Protobuf::Nats.config.connection_options)
 
-        @thread_pool = ::Protobuf::Nats::FixedThreadPoolWithNoQueue.new(options[:threads])
+        @thread_pool = ::Concurrent::FixedThreadPool.new(options[:threads], :max_queue => options[:threads])
 
         @subscriptions = []
       end
@@ -29,9 +28,7 @@ module Protobuf
       end
 
       def execute_request_promise(request_data, reply_id)
-        ::Concurrent::Promise.new(:executor => thread_pool).then do
-          # Publish an ACK.
-          nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK)
+        promise = ::Concurrent::Promise.new(:executor => thread_pool).then do
           # Process request.
           response_data = handle_request(request_data)
           # Publish response.
@@ -42,6 +39,11 @@ module Protobuf
             logger.error error.backtrace.join("\n")
           end
         end.execute
+
+        # Publish an ACK to signal the server has picked up the work.
+        nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK)
+
+        promise
       rescue ::Concurrent::RejectedExecutionError
         nil
       end

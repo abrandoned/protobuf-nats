@@ -32,10 +32,21 @@ describe ::Protobuf::Nats::Server do
   end
 
   describe "execute_request_promise" do
-    it "returns nil when the thread pool is full" do
-      # Block the thread pool.
+    it "returns nil when the thread pool and thread pool queue is full" do
+      # Fill the thread pool.
+      2.times { subject.thread_pool << lambda { sleep 1 } }
+      # Fill the thread pool queue.
       2.times { subject.thread_pool << lambda { sleep 1 } }
       expect(subject.execute_request_promise("", "")).to eq(nil)
+    end
+
+    it "sends an ACK if the thread pool enqueued the task" do
+      # Fill the thread pool.
+      2.times { subject.thread_pool << lambda { sleep 1 } }
+      expect(subject.nats).to receive(:publish).with("inbox_123", ::Protobuf::Nats::Messages::ACK)
+      # Wait for promise to finish executing.
+      promise = subject.execute_request_promise("", "inbox_123")
+      subject.thread_pool.kill
     end
 
     it "logs any error that is raised within the request promise chain" do
