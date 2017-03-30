@@ -9,7 +9,8 @@ module Protobuf
         # may need to override to setup connection at this stage ... may also do on load of class
         super
 
-        ::Protobuf::Nats.ensure_client_nats_connection_was_started
+        # This will ensure the client is started.
+        ::Protobuf::Nats.start_client_nats_connection
       end
 
       def close_connection
