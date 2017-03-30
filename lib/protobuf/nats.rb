@@ -22,6 +22,8 @@ module Protobuf
       ACK = "\1".freeze
     end
 
+    GET_CONNECTED_MUTEX = ::Mutex.new
+
     def self.config
       @config ||= begin
         config = ::Protobuf::Nats::Config.new
@@ -50,7 +52,13 @@ module Protobuf
     end
 
     def self.ensure_client_nats_connection_was_started
-      @ensure_client_nats_connection_was_started ||= start_client_nats_connection
+      @ensure_client_nats_connection_was_started ||= begin
+        GET_CONNECTED_MUTEX.synchronize do
+          return if @ensure_client_nats_connection_was_started
+          start_client_nats_connection
+          true
+        end
+      end
     end
   end
 end
