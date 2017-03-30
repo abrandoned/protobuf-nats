@@ -34,10 +34,7 @@ module Protobuf
           # Publish response.
           nats.publish(reply_id, response_data)
         end.on_error do |error|
-          logger.error error.to_s
-          if error.respond_to?(:backtrace) && error.backtrace.is_a?(::Array)
-            logger.error error.backtrace.join("\n")
-          end
+          log_error(error)
         end.execute
 
         # Publish an ACK to signal the server has picked up the work.
@@ -46,6 +43,13 @@ module Protobuf
         promise
       rescue ::Concurrent::RejectedExecutionError
         nil
+      end
+
+      def log_error(error)
+        logger.error error.to_s
+        if error.respond_to?(:backtrace) && error.backtrace.is_a?(::Array)
+          logger.error error.backtrace.join("\n")
+        end
       end
 
       def subscribe_to_services
@@ -75,6 +79,14 @@ module Protobuf
 
         nats.on_disconnect do
           logger.warn "Disconnected from NATS server!"
+        end
+
+        nats.on_error do |error|
+          log_error(error)
+        end
+
+        nats.on_close do
+          logger.warn "NATS connection was closed!"
         end
 
         subscribe_to_services
