@@ -7,6 +7,7 @@ require "protobuf/rpc/service_directory"
 require "concurrent"
 require "nats/io/client"
 
+require "protobuf/nats/wrapper"
 require "protobuf/nats/client"
 require "protobuf/nats/server"
 require "protobuf/nats/runner"
@@ -46,11 +47,11 @@ module Protobuf
         GET_CONNECTED_MUTEX.synchronize do
           return if @start_client_nats_connection
 
-          @client_nats_connection = ::NATS::IO::Client.new
+          @client_nats_connection = ::Protobuf::Nats::Wrapper.new
           @client_nats_connection.connect(config.connection_options)
 
           # Ensure we have a valid connection to the NATS server.
-          @client_nats_connection.flush(5)
+          @client_nats_connection.flush(5_000)
 
           true
         end

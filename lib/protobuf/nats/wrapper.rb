@@ -19,7 +19,7 @@ module Protobuf
       end
 
       def connect(opts = {})
-        servers = opts.fetch(:servers, DEFAULT_SERVERS)
+        servers = opts.fetch(:servers) || DEFAULT_SERVERS
 
         options_ptr = ::FFI::MemoryPointer.new(:pointer)
         check ::FFI::Nats::Core.natsOptions_Create(options_ptr)
@@ -43,8 +43,8 @@ module Protobuf
         ::FFI::Nats::Core.natsOptions_Destroy(@options_ptr) if @options_ptr
       end
 
-      def flush
-        check ::FFI::Nats::Core.natsConnection_FlushTimeout(@connection_ptr, 5_000)
+      def flush(timeout = 500)
+        check ::FFI::Nats::Core.natsConnection_FlushTimeout(@connection_ptr, timeout)
         true
       end
 
@@ -62,6 +62,7 @@ module Protobuf
       end
 
       def subscribe(subject, options = {}, &block)
+        max = options[:max]
         subscription_ptr = ::FFI::MemoryPointer.new(:pointer)
         if block
           callback = create_callback do |message_ptr|
@@ -72,7 +73,13 @@ module Protobuf
         else
           check ::FFI::Nats::Core.natsConnection_SubscribeSync(subscription_ptr, @connection_ptr, subject)
         end
-        subscription_ptr.read_pointer
+
+        subscription_ptr = subscription_ptr.read_pointer
+        if max
+          check ::FFI::Nats::Core.natsSubscription_AutoUnsubscribe(subscription_ptr, max);
+        end
+
+        subscription_ptr
       end
 
       def next_message(subscription_ptr, timeout = 500)
@@ -93,7 +100,6 @@ module Protobuf
       end
 
       def unsubscribe(subscription_ptr, options = {})
-        return nil if nullptr?(subscription_ptr)
         ::FFI::Nats::Core.natsSubscription_Unsubscribe(subscription_ptr)
         ::FFI::Nats::Core.natsSubscription_Destroy(subscription_ptr)
       end
