@@ -18,6 +18,12 @@ module Protobuf
         end
       end
 
+      def initialize
+        @error_cb = lambda {|_error_code|}
+        @reconnect_cb = lambda {|_error_code|}
+        @disconnect_cb = lambda {|_error_code|}
+      end
+
       def connect(opts = {})
         servers = opts.fetch(:servers) || DEFAULT_SERVERS
 
@@ -28,6 +34,19 @@ module Protobuf
           check ::FFI::Nats::Core.natsOptions_SetServers(@options_ptr, ptr, servers.size)
         end
         check ::FFI::Nats::Core.natsOptions_UseGlobalMessageDelivery(@options_ptr, true)
+
+        error_cb = create_error_callback do |error_code|
+          @error_cb.call(error_code)
+        end
+        check ::FFI::Nats::Core.natsOptions_SetErrorHandler(@options_ptr, error_cb, nil)
+        disconnect_cb = create_connect_callback do
+          @disconnect_cb.call
+        end
+        check ::FFI::Nats::Core.natsOptions_SetDisconnectedCB(@options_ptr, disconnect_cb, nil)
+        reconnect_cb = create_connect_callback do
+          @reconnect_cb.call
+        end
+        check ::FFI::Nats::Core.natsOptions_SetReconnectedCB(@options_ptr, reconnect_cb, nil)
 
         connection_ptr = ::FFI::MemoryPointer.new(:pointer)
         check ::FFI::Nats::Core.natsConnection_Connect(connection_ptr, @options_ptr)
@@ -95,6 +114,18 @@ module Protobuf
         message
       end
 
+      def on_error(&block)
+        @error_cb = block
+      end
+
+      def on_disconnect(&block)
+        @disconnect_cb = block
+      end
+
+      def on_reconnect(&block)
+        @reconnect_cb = block
+      end
+
       def new_inbox
         "_INBOX.#{::SecureRandom.hex(13)}"
       end
@@ -112,9 +143,21 @@ module Protobuf
         ptr.null?
       end
 
-      def create_callback(block)
+      def create_callback
         ::FFI::Function.new(:void, [:pointer, :pointer, :pointer, :pointer], :blocking => true) do |_, _, message_ptr, _|
-          yield(msg)
+          yield(message_ptr)
+        end
+      end
+
+      def create_connect_callback
+        ::FFI::Function.new(:void, [:pointer, :pointer], :blocking => true) do |_, _|
+          yield
+        end
+      end
+
+      def create_error_callback
+        ::FFI::Function.new(:void, [:pointer, :pointer, :int, :pointer], :blocking => true) do |_, _, error_code, _|
+          yield(error_code)
         end
       end
 

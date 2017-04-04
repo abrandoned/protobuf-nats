@@ -15,7 +15,7 @@ module Protobuf
         @running = true
         @stopped = false
 
-        @nats = options[:client] || ::NATS::IO::Client.new
+        @nats = options[:client] || ::Protobuf::Nats::Wrapper.new
         @nats.connect(::Protobuf::Nats.config.connection_options)
 
         @thread_pool = ::Concurrent::FixedThreadPool.new(options[:threads], :max_queue => options[:threads])
@@ -81,12 +81,9 @@ module Protobuf
           logger.warn "Disconnected from NATS server!"
         end
 
-        nats.on_error do |error|
-          log_error(error)
-        end
-
-        nats.on_close do
-          logger.warn "NATS connection was closed!"
+        nats.on_error do |error_code|
+          enum = ::FFI::Nats::Core::NATS_STATUS.find(error_code)
+          logger.error "Received error from cnats: #{error_code} - #{enum}"
         end
 
         subscribe_to_services
@@ -99,8 +96,8 @@ module Protobuf
         end
 
         logger.info "Unsubscribing from rpc routes..."
-        subscriptions.each do |subscription_id|
-          nats.unsubscribe(subscription_id)
+        subscriptions.each do |subscription_ptr|
+          nats.unsubscribe(subscription_ptr)
         end
 
         logger.info "Waiting up to 60 seconds for the thread pool to finish shutting down..."
