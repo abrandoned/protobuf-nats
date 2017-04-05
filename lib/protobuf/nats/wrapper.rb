@@ -42,19 +42,7 @@ module Protobuf
         # Essentially never stop attempting reconncts
         check ::FFI::Nats::Core.natsOptions_SetMaxReconnect(options_ptr, 60_000)
 
-        error_cb = @options_cb["error"] = create_error_callback do |error_code|
-          @error_cb.call(error_code)
-        end
-        check ::FFI::Nats::Core.natsOptions_SetErrorHandler(options_ptr, error_cb, nil)
-        disconnect_cb = @options_cb["disconnect"] = create_connect_callback do
-          @disconnect_cb.call
-        end
-        check ::FFI::Nats::Core.natsOptions_SetDisconnectedCB(options_ptr, disconnect_cb, nil)
-        reconnect_cb = @options_cb["reconnect"] = create_connect_callback do
-          @reconnect_cb.call
-        end
-        check ::FFI::Nats::Core.natsOptions_SetReconnectedCB(options_ptr, reconnect_cb, nil)
-
+        setup_callbacks(options_ptr)
         apply_tls_options(options_ptr, config) if config.uses_tls
 
         connection_ptr = ::FFI::MemoryPointer.new(:pointer)
@@ -90,6 +78,9 @@ module Protobuf
         true
       end
 
+      # NOTE: Calling subscribe with a block is not thread safe. We have to keep track of the function pointer
+      # so it's not GC'd and breaks the VM. We are only using subscribe with a block on a single thread ever
+      # si it's not that big of a deal. If the implementation changes, you need to change this.
       def subscribe(subject, options = {}, &block)
         max = options[:max]
         queue = options[:queue]
@@ -208,6 +199,21 @@ module Protobuf
         return if response_code == NATS_OK
         enum = ::FFI::Nats::Core::NATS_STATUS.find(response_code)
         fail "Received bad response code from cnats: #{response_code} - #{enum}"
+      end
+
+      def setup_callbacks(options_ptr)
+        error_cb = @options_cb["error"] = create_error_callback do |error_code|
+          @error_cb.call(error_code)
+        end
+        check ::FFI::Nats::Core.natsOptions_SetErrorHandler(options_ptr, error_cb, nil)
+        disconnect_cb = @options_cb["disconnect"] = create_connect_callback do
+          @disconnect_cb.call
+        end
+        check ::FFI::Nats::Core.natsOptions_SetDisconnectedCB(options_ptr, disconnect_cb, nil)
+        reconnect_cb = @options_cb["reconnect"] = create_connect_callback do
+          @reconnect_cb.call
+        end
+        check ::FFI::Nats::Core.natsOptions_SetReconnectedCB(options_ptr, reconnect_cb, nil)
       end
 
       def apply_tls_options(options_ptr, config)
