@@ -4,4 +4,3 @@ source 'https://rubygems.org'
 gemspec
 
 gem "ffi-nats-core", :path => "../ffi-nats-core"
-gem "ffi-rzmq"
