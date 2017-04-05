@@ -4,8 +4,11 @@ rvm:
   - 2.3.0
   - jruby-9.1.7.0
 before_install:
-  - wget https://github.com/nats-io/cnats/archive/v1.5.0.tar.gz
-  - tar -xvf v1.5.0.tar.gz
+#  - wget https://github.com/nats-io/cnats/archive/v1.5.0.tar.gz
+#  - tar -xvf v1.5.0.tar.gz
+  - wget https://github.com/film42/cnats/archive/gt/fix_librt.zip
+  - unzip fix_librt.zip
+  - mv cnats-gt-fix_librt cnats-1.5.0
   - mkdir -p cnats-1.5.0/build && cd cnats-1.5.0/build
   - cmake .. && make -j4
   - gem install bundler -v 1.14.3
