@@ -1,7 +1,7 @@
 require "active_support/core_ext/class/subclasses"
 require "protobuf/rpc/server"
 require "protobuf/rpc/service"
-require "protobuf/nats/tp"
+require "protobuf/nats/thread_pool"
 
 module Protobuf
   module Nats
