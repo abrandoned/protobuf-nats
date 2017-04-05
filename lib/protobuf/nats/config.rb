@@ -4,7 +4,7 @@ require "yaml"
 module Protobuf
   module Nats
     class Config
-      attr_accessor :uses_tls, :servers, :connect_timeout, :tls_client_cert, :tls_client_key
+      attr_accessor :uses_tls, :servers, :connect_timeout, :tls_client_cert, :tls_client_key, :tls_ca_cert
 
       CONFIG_MUTEX = ::Mutex.new
 
@@ -13,6 +13,7 @@ module Protobuf
         :servers => ["nats://localhost:4222"],
         :tls_client_cert => nil,
         :tls_client_key => nil,
+        :tls_ca_cert => nil,
         :uses_tls => false,
       }.freeze
 

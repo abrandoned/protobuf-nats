@@ -10,14 +10,10 @@ module Protobuf
         attr_reader :subject, :reply, :data
         def initialize(message_ptr)
           @subject, _ = ::FFI::Nats::Core.natsMsg_GetSubject(message_ptr)
-          @subject = @subject.dup
-
           @reply, _ = ::FFI::Nats::Core.natsMsg_GetReply(message_ptr)
-          @reply = @reply.dup
-
           data_length = ::FFI::Nats::Core.natsMsg_GetDataLength(message_ptr)
           _, data_ptr = ::FFI::Nats::Core.natsMsg_GetData(message_ptr)
-          @data = data_ptr.read_bytes(data_length).dup
+          @data = data_ptr.read_bytes(data_length)
         end
       end
 
@@ -215,7 +211,19 @@ module Protobuf
         cert = config.tls_client_cert
         key = config.tls_client_key
         return unless cert && key
-        check ::FFI::Nats::Core.natsOptions_LoadCertificatesChain(options_ptr, config.tls_client_cert, config.tls_client_key)
+
+        cert = ::File.expand_path(cert)
+        key = ::File.expand_path(key)
+        check ::FFI::Nats::Core.natsOptions_SetSecure(options_ptr, true)
+        check ::FFI::Nats::Core.natsOptions_LoadCertificatesChain(options_ptr, cert, key)
+
+        if ca_cert = config.tls_ca_cert
+          return unless ca_cert
+          ca_cert = ::File.expand_path(ca_cert)
+          check ::FFI::Nats::Core.natsOptions_LoadCATrustedCertificates(options_ptr, ca_cert)
+        end
+
+        true
       end
     end
   end
