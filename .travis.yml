@@ -5,7 +5,7 @@ rvm:
   - jruby-9.1.7.0
 before_install:
   - wget https://github.com/nats-io/cnats/archive/v1.5.0.tar.gz
-  - tar xfg v1.5.0.tar.gz
+  - tar -xvf v1.5.0.tar.gz
   - mkdir -p cnats-1.5.0/build && cd cnats-1.5.0/build
   - cmake .. && make -j4
   - gem install bundler -v 1.14.3
@@ -17,4 +17,4 @@ addons:
       - cmake
 env:
   global:
-    - NATS_LIB_PATH=$TRAVIS_BUILD_DIR/cnats-1.5.0/build/src/libnats.so
+    - NATS_LIB_PATH=$TRAVIS_BUILD_DIR/cnats-1.5.0/build/src
