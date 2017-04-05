@@ -31,6 +31,14 @@ class FakeNatsClient
   def unsubscribe(*)
   end
 
+  def next_message(_sub, timeout)
+    timeout = timeout / 1_000.to_f
+    started_at = ::Time.now
+    @next_message = nil
+    sleep 0.01 while @next_message.nil? && timeout > (::Time.now - started_at)
+    @next_message
+  end
+
   def schedule_message(message)
     schedule_messages([message])
   end
@@ -42,6 +50,7 @@ class FakeNatsClient
           sleep message.seconds_in_future
           block = subscriptions[message.subject]
           block.call(message.data) if block
+          @next_message = message
         rescue => error
           puts error
         end
