@@ -3,7 +3,6 @@ require "ffi/nats/core"
 module Protobuf
   module Nats
     class Wrapper
-      DEFAULT_SERVERS = ["nats://localhost:4222"]
       NATS_OK = ::FFI::Nats::Core::NATS_STATUS[:NATS_OK]
       NATS_TIMEOUT = ::FFI::Nats::Core::NATS_STATUS[:NATS_TIMEOUT]
 
@@ -32,8 +31,9 @@ module Protobuf
         @options_cb = {}
       end
 
-      def connect(opts = {})
-        servers = opts.fetch(:servers) || DEFAULT_SERVERS
+      def connect(config = nil)
+        config ||= ::Protobuf::Nats.config
+        servers = config.servers
 
         options_ptr = ::FFI::MemoryPointer.new(:pointer)
         check ::FFI::Nats::Core.natsOptions_Create(options_ptr)
@@ -55,6 +55,8 @@ module Protobuf
           @reconnect_cb.call
         end
         check ::FFI::Nats::Core.natsOptions_SetReconnectedCB(options_ptr, reconnect_cb, nil)
+
+        apply_tls_options(options_ptr, config) if config.uses_tls
 
         connection_ptr = ::FFI::MemoryPointer.new(:pointer)
         check ::FFI::Nats::Core.natsConnection_Connect(connection_ptr, options_ptr)
@@ -207,6 +209,13 @@ module Protobuf
         return if response_code == NATS_OK
         enum = ::FFI::Nats::Core::NATS_STATUS.find(response_code)
         fail "Received bad response code from cnats: #{response_code} - #{enum}"
+      end
+
+      def apply_tls_options(options_ptr, config)
+        cert = config.tls_client_cert
+        key = config.tls_client_key
+        return unless cert && key
+        check ::FFI::Nats::Core.natsOptions_LoadCertificatesChain(options_ptr, config.tls_client_cert, config.tls_client_key)
       end
     end
   end

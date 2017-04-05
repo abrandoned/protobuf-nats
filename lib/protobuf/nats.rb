@@ -48,7 +48,7 @@ module Protobuf
           return if @start_client_nats_connection
 
           @client_nats_connection = ::Protobuf::Nats::Wrapper.new
-          @client_nats_connection.connect(config.connection_options)
+          @client_nats_connection.connect(config)
 
           # Ensure we have a valid connection to the NATS server.
           @client_nats_connection.flush(5_000)

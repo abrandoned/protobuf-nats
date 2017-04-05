@@ -10,7 +10,7 @@ module Protobuf
 
       DEFAULTS = {
         :connect_timeout => nil,
-        :servers => nil,
+        :servers => ["nats://localhost:4222"],
         :tls_client_cert => nil,
         :tls_client_key => nil,
         :uses_tls => false,
@@ -40,32 +40,9 @@ module Protobuf
               __send__("#{key}=", setting) if setting
             end
 
-            # Reload the connection options hash
-            connection_options(true)
-
             true
           end
         end
-      end
-
-      def connection_options(reload = false)
-        @connection_options = false if reload
-        @connection_options ||= begin
-          options = {
-            servers: servers,
-            connect_timeout: connect_timeout
-          }
-          options[:tls] = {:context => new_tls_context} if uses_tls
-          options
-        end
-      end
-
-      def new_tls_context
-        tls_context = ::OpenSSL::SSL::SSLContext.new
-        tls_context.ssl_version = :TLSv1_2
-        tls_context.cert = ::OpenSSL::X509::Certificate.new(::File.read(tls_client_cert)) if tls_client_cert
-        tls_context.key = ::OpenSSL::PKey::RSA.new(::File.read(tls_client_key)) if tls_client_key
-        tls_context
       end
 
     end

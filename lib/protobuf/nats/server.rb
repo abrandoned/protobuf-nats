@@ -17,7 +17,7 @@ module Protobuf
         @stopped = false
 
         @nats = options[:client] || ::Protobuf::Nats::Wrapper.new
-        @nats.connect(::Protobuf::Nats.config.connection_options)
+        @nats.connect(::Protobuf::Nats.config)
 
         @thread_pool = ::Protobuf::Nats::ThreadPool.new(options[:threads], :max_queue => options[:threads])
 
