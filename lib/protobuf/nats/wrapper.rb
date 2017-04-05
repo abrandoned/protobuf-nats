@@ -39,6 +39,9 @@ module Protobuf
         end
         check ::FFI::Nats::Core.natsOptions_UseGlobalMessageDelivery(options_ptr, true)
 
+        # Essentially never stop attempting reconncts
+        check ::FFI::Nats::Core.natsOptions_SetMaxReconnect(options_ptr, 60_000)
+
         error_cb = @options_cb["error"] = create_error_callback do |error_code|
           @error_cb.call(error_code)
         end
