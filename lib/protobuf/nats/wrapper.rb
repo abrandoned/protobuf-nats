@@ -26,7 +26,10 @@ module Protobuf
         @error_cb = lambda {|_error_code|}
         @reconnect_cb = lambda {|_error_code|}
         @disconnect_cb = lambda {|_error_code|}
+
+        # We need to store refs so these function pointers are not GCd.
         @sub_cb = {}
+        @options_cb = {}
       end
 
       def connect(opts = {})
@@ -40,18 +43,18 @@ module Protobuf
         end
         check ::FFI::Nats::Core.natsOptions_UseGlobalMessageDelivery(options_ptr, true)
 
-        # error_cb = create_error_callback do |error_code|
-        #   @error_cb.call(error_code)
-        # end
-        # check ::FFI::Nats::Core.natsOptions_SetErrorHandler(options_ptr, error_cb, nil)
-        # disconnect_cb = create_connect_callback do
-        #   @disconnect_cb.call
-        # end
-        # check ::FFI::Nats::Core.natsOptions_SetDisconnectedCB(options_ptr, disconnect_cb, nil)
-        # reconnect_cb = create_connect_callback do
-        #   @reconnect_cb.call
-        # end
-        # check ::FFI::Nats::Core.natsOptions_SetReconnectedCB(options_ptr, reconnect_cb, nil)
+        error_cb = @options_cb["error"] = create_error_callback do |error_code|
+          @error_cb.call(error_code)
+        end
+        check ::FFI::Nats::Core.natsOptions_SetErrorHandler(options_ptr, error_cb, nil)
+        disconnect_cb = @options_cb["disconnect"] = create_connect_callback do
+          @disconnect_cb.call
+        end
+        check ::FFI::Nats::Core.natsOptions_SetDisconnectedCB(options_ptr, disconnect_cb, nil)
+        reconnect_cb = @options_cb["reconnect"] = create_connect_callback do
+          @reconnect_cb.call
+        end
+        check ::FFI::Nats::Core.natsOptions_SetReconnectedCB(options_ptr, reconnect_cb, nil)
 
         connection_ptr = ::FFI::MemoryPointer.new(:pointer)
         check ::FFI::Nats::Core.natsConnection_Connect(connection_ptr, options_ptr)
@@ -88,26 +91,37 @@ module Protobuf
 
       def subscribe(subject, options = {}, &block)
         max = options[:max]
+        queue = options[:queue]
         no_delay = options.fetch(:no_delay, false)
         subscription_ptr = ::FFI::MemoryPointer.new(:pointer)
+
+        callback = nil
         if block
           callback = @sub_cb[subject] = create_callback do |message_ptr|
-            puts "IN CALLBACK"
             message = Message.new(message_ptr)
             block.call(message.data, message.reply, message.subject)
             ::FFI::Nats::Core.natsMsg_Destroy(message_ptr)
-            puts "DONE CALLBACK #{message.reply}"
           end
-          check ::FFI::Nats::Core.natsConnection_Subscribe(subscription_ptr, @connection_ptr, subject, callback, nil)
+        end
+
+        if queue
+          if block
+            check ::FFI::Nats::Core.natsConnection_QueueSubscribe(subscription_ptr, @connection_ptr, subject, queue, callback, nil)
+          else
+            check ::FFI::Nats::Core.natsConnection_QueueSubscribeSync(subscription_ptr, @connection_ptr, subject, queue)
+          end
         else
-          check ::FFI::Nats::Core.natsConnection_SubscribeSync(subscription_ptr, @connection_ptr, subject)
+          if block
+            check ::FFI::Nats::Core.natsConnection_Subscribe(subscription_ptr, @connection_ptr, subject, callback, nil)
+          else
+            check ::FFI::Nats::Core.natsConnection_SubscribeSync(subscription_ptr, @connection_ptr, subject)
+          end
         end
 
         subscription_ptr = subscription_ptr.read_pointer
-        # check ::FFI::Nats::Core.natsSubscription_SetPendingLimits(subscription_ptr, -1, -1)
-        # if max
-        #   check ::FFI::Nats::Core.natsSubscription_AutoUnsubscribe(subscription_ptr, max)
-        # end
+        if max
+          check ::FFI::Nats::Core.natsSubscription_AutoUnsubscribe(subscription_ptr, max)
+        end
 
         if no_delay
           check ::FFI::Nats::Core.natsSubscription_NoDeliveryDelay(subscription_ptr)
@@ -120,14 +134,11 @@ module Protobuf
 
         message = nil
         ::FFI::MemoryPointer.new(:pointer) do |message_ptr|
-          ::Protobuf::Logging.logger.info "STARTING NEXT MESSAGE"
           code = ::FFI::Nats::Core.natsSubscription_NextMsg(message_ptr, subscription_ptr, timeout)
           if code == NATS_TIMEOUT
-            ::Protobuf::Logging.logger.info "TIMEOUT NEXT MESSAGE"
             return nil
           end
 
-          ::Protobuf::Logging.logger.info "RECEIVED NEXT MESSAGE"
           check(code)
           message = Message.new(message_ptr.read_pointer)
           ::FFI::Nats::Core.natsMsg_Destroy(message_ptr.read_pointer)
@@ -165,24 +176,22 @@ module Protobuf
       end
 
       def create_callback
-        #::FFI::Function.new(:void, [:pointer, :pointer, :pointer, :pointer], :blocking => true) do |_, _, message_ptr, _|
-        ::Proc.new do |_, _, message_ptr, _|
+        ::FFI::Function.new(:void, [:pointer, :pointer, :pointer, :pointer], :blocking => true) do |_, _, message_ptr, _|
           yield(message_ptr)
         end
-          #end
       end
 
-      # def create_connect_callback
-      #   ::FFI::Function.new(:void, [:pointer, :pointer], :blocking => true) do |_, _|
-      #     yield
-      #   end
-      # end
+      def create_connect_callback
+        ::FFI::Function.new(:void, [:pointer, :pointer], :blocking => true) do |_, _|
+          yield
+        end
+      end
 
-      # def create_error_callback
-      #   ::FFI::Function.new(:void, [:pointer, :pointer, :int, :pointer], :blocking => true) do |_, _, error_code, _|
-      #     yield(error_code)
-      #   end
-      # end
+      def create_error_callback
+        ::FFI::Function.new(:void, [:pointer, :pointer, :int, :pointer], :blocking => true) do |_, _, error_code, _|
+          yield(error_code)
+        end
+      end
 
       def create_servers_ptr(servers)
         server_pointers = servers.map { |uri| ::FFI::MemoryPointer.from_string(uri) }
