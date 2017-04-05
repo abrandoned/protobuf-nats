@@ -1,43 +1,21 @@
 require "spec_helper"
 
 describe ::Protobuf::Nats::Config do
-  it "sets servers and connect_timeout to nil by default" do
-    expect(subject.servers).to eq(nil)
+  it "sets servers to localhost by default" do
+    expect(subject.servers).to eq(["nats://localhost:4222"])
+  end
+
+  it "sets connect_timeout to nil by default" do
     expect(subject.connect_timeout).to eq(nil)
   end
 
-  it "does not load tls by default" do
-    subject.servers = ["nats://127.0.0.1:4222"]
-    expected_options = {
-      :servers => ["nats://127.0.0.1:4222"],
-      :connect_timeout => nil
-    }
-    expect(subject.connection_options).to eq(expected_options)
-  end
-
-  it "can provide a tls context" do
-    subject.servers = ["nats://127.0.0.1:4222"]
-    subject.uses_tls = true
-    tls_context = subject.connection_options[:tls][:context]
-    expect(tls_context).to be_an(::OpenSSL::SSL::SSLContext)
-  end
-
-  it "can load a custom cert into the ssl context" do
+  it "can load a custom cert, key and ca from yml" do
     ENV["PROTOBUF_NATS_CONFIG_PATH"] = "spec/support/protobuf_nats.yml"
 
     subject.load_from_yml
-    expected_cert = ::File.read("spec/support/certs/client-cert.pem")
-    expect(subject.new_tls_context.cert.to_s).to eq(expected_cert)
-
-    ENV["PROTOBUF_NATS_CONFIG_PATH"] = nil
-  end
-
-  it "can load a custom key into the ssl context" do
-    ENV["PROTOBUF_NATS_CONFIG_PATH"] = "spec/support/protobuf_nats.yml"
-
-    subject.load_from_yml
-    expected_key = ::File.read("spec/support/certs/client-key.pem")
-    expect(subject.new_tls_context.key.to_s).to eq(expected_key)
+    expect(subject.tls_client_cert).to eq("./spec/support/certs/client-cert.pem")
+    expect(subject.tls_client_key).to eq("./spec/support/certs/client-key.pem")
+    expect(subject.tls_ca_cert).to eq("./spec/support/certs/ca.pem")
 
     ENV["PROTOBUF_NATS_CONFIG_PATH"] = nil
   end
@@ -47,7 +25,6 @@ describe ::Protobuf::Nats::Config do
 
     subject.load_from_yml
     expect(subject.servers).to eq(["nats://127.0.0.1:4222", "nats://127.0.0.1:4223", "nats://127.0.0.1:4224"])
-    expect(subject.uses_tls).to eq(true)
     expect(subject.connect_timeout).to eq(2)
 
     ENV["PROTOBUF_NATS_CONFIG_PATH"] = nil
@@ -57,8 +34,11 @@ describe ::Protobuf::Nats::Config do
     ENV["PROTOBUF_NATS_CONFIG_PATH"] = "spec/support/i_do_not_exist_because_im_not_real"
 
     subject.load_from_yml
-    expect(subject.servers).to eq(nil)
+    expect(subject.servers).to eq(["nats://localhost:4222"])
     expect(subject.uses_tls).to eq(false)
+    expect(subject.tls_client_cert).to eq(nil)
+    expect(subject.tls_client_key).to eq(nil)
+    expect(subject.tls_ca_cert).to eq(nil)
     expect(subject.connect_timeout).to eq(nil)
 
     ENV["PROTOBUF_NATS_CONFIG_PATH"] = nil
