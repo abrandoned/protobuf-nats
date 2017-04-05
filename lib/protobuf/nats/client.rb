@@ -43,59 +43,6 @@ module Protobuf
         end
       end
 
-      # # This is a request that expects two responses.
-      # # 1. An ACK from the server. We use a shorter timeout.
-      # # 2. A PB message from the server. We use a longer timoeut.
-      # def nats_request_with_two_responses(subject, data, opts)
-      #   nats = Protobuf::Nats.client_nats_connection
-      #   inbox = nats.new_inbox
-      #   lock = ::Monitor.new
-      #   ack_condition = lock.new_cond
-      #   pb_response_condition = lock.new_cond
-      #   response = nil
-      #   sub_ptr = nats.subscribe(inbox, :no_delay => true, :max => 2) do |message, _, _|
-      #     lock.synchronize do
-      #       case message
-      #       when ::Protobuf::Nats::Messages::ACK
-      #         ack_condition.signal
-      #         next
-      #       else
-      #         response = message
-      #         pb_response_condition.signal
-      #       end
-      #     end
-      #   end
-
-      #   # Publish to server
-      #   nats.publish(subject, data, inbox)
-
-      #   lock.synchronize do
-      #     # Wait for the ACK from the server
-      #     ack_timeout = opts[:ack_timeout] || 5_000
-      #     with_timeout(ack_timeout) { ack_condition.wait(ack_timeout) }
-
-      #     # Wait for the protobuf response
-      #     timeout = opts[:timeout] || 60_000
-      #     with_timeout(timeout) { pb_response_condition.wait(timeout) } unless response
-      #   end
-
-      #   completed_both = true
-
-      #   response
-      # ensure
-      #   # Ensure we don't leave a subscription sitting around.
-      #   nats.unsubscribe(sub_ptr) unless completed_both
-      # end
-
-      # # This is a copy of #with_nats_timeout
-      # def with_timeout(timeout)
-      #   start_time = ::NATS::MonotonicTime.now
-      #   yield
-      #   end_time = ::NATS::MonotonicTime.now
-      #   duration = end_time - start_time
-      #   raise ::NATS::IO::Timeout.new("nats: timeout") if duration > timeout
-      # end
-
       # This is a request that expects two responses.
       # 1. An ACK from the server. We use a shorter timeout.
       # 2. A PB message from the server. We use a longer timoeut.
@@ -105,23 +52,19 @@ module Protobuf
         # Wait for the protobuf response
         timeout = opts[:timeout] || 60_000
 
-        nats = Protobuf::Nats.client_nats_connection
+        nats = ::Protobuf::Nats.client_nats_connection
         inbox = nats.new_inbox
 
-        # ::Protobuf::Logging.logger.info "START FOR #{inbox}"
         # Publish to server
+        sub_ptr = nats.subscribe(inbox, :max => 2, :no_delay => true)
         nats.publish(subject, data, inbox)
-        # ::Protobuf::Logging.logger.info "PUB FOR #{inbox}"
+        nats.flush
 
         # Wait for reply
-        sub_ptr = nats.subscribe(inbox, :max => 2, :no_delay => true)
-        # ::Protobuf::Logging.logger.info "SUB FOR #{inbox}"
         first_message = nats.next_message(sub_ptr, ack_timeout)
         fail ::NATS::IO::Timeout if first_message.nil?
-        # ::Protobuf::Logging.logger.info "RECEIVED MESSAGE ONE FOR #{inbox} - #{first_message.data.size}"
         second_message = nats.next_message(sub_ptr, timeout)
         fail ::NATS::IO::Timeout if second_message.nil?
-        # ::Protobuf::Logging.logger.info "RECEIVED MESSAGE TWO FOR #{inbox} - #{second_message.data.size}"
 
         # Check messages
         response = nil
@@ -135,17 +78,15 @@ module Protobuf
         else response = second_message.data
         end
 
-        two_messages = true
         success = has_ack && response
-        fail ::NATS::IO::Timeout, "YOU NEED MORE DATA @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" unless success
+        fail ::NATS::IO::Timeout unless success
 
-        # ::Protobuf::Logging.logger.info "DONE FOR #{inbox}"
         response
       ensure
         # Ensure we don't leave a subscriptiosn sitting around.
-        # This also cleans up memory.
-        nats.unsubscribe(sub_ptr) unless two_messages
-        # ::Protobuf::Logging.logger.info "UNSUB FOR #{inbox}"
+        # This also cleans up memory. It's a no-op if the subscription
+        # is already cleaned up.
+        nats.unsubscribe(sub_ptr)
       end
 
     end

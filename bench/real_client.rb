@@ -5,8 +5,8 @@ ENV["PB_CLIENT_TYPE"] = "protobuf/nats/client"
 
 require "benchmark/ips"
 require "./examples/warehouse/app"
-require "ruby-prof"
-require 'ruby-prof-flamegraph'
+# require "ruby-prof"
+#require 'ruby-prof-flamegraph'
 
 Protobuf::Logging.logger = ::Logger.new(nil)
 
@@ -17,8 +17,8 @@ Protobuf::Logging.logger = ::Logger.new(nil)
 #result = RubyProf.profile do
 
   Benchmark.ips do |config|
-    config.warmup = 30
-    config.time = 30
+    config.warmup = 10
+    config.time = 10
 
     config.report("single threaded performance") do
       begin

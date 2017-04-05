@@ -36,7 +36,7 @@ module Protobuf
         thread_pool.push do
           begin
             # logger.info "INSIDE POOL FOR #{reply_id}"
-            puts "here: #{reply_id}"
+            #puts "here: #{reply_id}"
             # Publish an ACK to signal the server has picked up the work.
             # logger.info "PUBLISHED ACK FOR #{reply_id}"
             nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK)
@@ -46,7 +46,8 @@ module Protobuf
             # logger.info "PROCESSED REQUEST FOR #{reply_id}"
             # Publish response.
             nats.publish(reply_id, response_data)
-            puts "DONE PUB: #{reply_id}"
+            nats.flush
+            # puts "DONE PUB: #{reply_id}"
             # logger.info "PUBLISHED RESPONSE FOR #{reply_id}"
           rescue => error
             log_error(error)
