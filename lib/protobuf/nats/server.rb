@@ -28,12 +28,9 @@ module Protobuf
         ::Protobuf::Rpc::Service.implemented_services.map(&:safe_constantize)
       end
 
-      def execute_request_promise(request_data, reply_id)
-        thread_pool.push do
+      def enqueue_request(request_data, reply_id)
+        was_enqueued = thread_pool.push do
           begin
-            # Publish an ACK to signal the server has picked up the work.
-            nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK)
-
             # Process request.
             response_data = handle_request(request_data)
 
@@ -44,6 +41,11 @@ module Protobuf
             log_error(error)
           end
         end
+
+        # Publish an ACK to signal the server has picked up the work.
+        nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK) if was_enqueued
+
+        was_enqueued
       end
 
       def log_error(error)
@@ -65,7 +67,7 @@ module Protobuf
             logger.info "  - #{subscription_key_and_queue}"
 
             subscriptions << nats.subscribe(subscription_key_and_queue, :no_delay => true, :queue => subscription_key_and_queue) do |request_data, reply_id, _subject|
-              unless execute_request_promise(request_data, reply_id)
+              unless enqueue_request(request_data, reply_id)
                 logger.error { "Thread pool is full! Dropping message for: #{subscription_key_and_queue}" }
               end
             end

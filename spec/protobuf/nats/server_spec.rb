@@ -47,21 +47,21 @@ describe ::Protobuf::Nats::Server do
     end
   end
 
-  describe "execute_request_promise" do
-    it "returns nil when the thread pool and thread pool queue is full" do
+  describe "#enqueue_request" do
+    it "returns false when the thread pool and thread pool queue is full" do
       # Fill the thread pool.
-      2.times { subject.thread_pool << lambda { sleep 1 } }
+      2.times { subject.thread_pool.push { sleep 1 } }
       # Fill the thread pool queue.
-      2.times { subject.thread_pool << lambda { sleep 1 } }
-      expect(subject.execute_request_promise("", "")).to eq(nil)
+      2.times { subject.thread_pool.push { sleep 1 } }
+      expect(subject.enqueue_request("", "")).to eq(false)
     end
 
     it "sends an ACK if the thread pool enqueued the task" do
       # Fill the thread pool.
-      2.times { subject.thread_pool << lambda { sleep 1 } }
+      2.times { subject.thread_pool.push { sleep 1 } }
       expect(subject.nats).to receive(:publish).with("inbox_123", ::Protobuf::Nats::Messages::ACK)
       # Wait for promise to finish executing.
-      promise = subject.execute_request_promise("", "inbox_123")
+      expect(subject.enqueue_request("", "inbox_123")).to eq(true)
       subject.thread_pool.kill
     end
 
@@ -72,8 +72,8 @@ describe ::Protobuf::Nats::Server do
       expect(logger).to receive(:error).once.ordered
 
       # Wait for promise to finish executing.
-      promise = subject.execute_request_promise(request_data, "inbox_123")
-      promise.value
+      expect(subject.enqueue_request(request_data, "inbox_123")).to eq(true)
+      sleep 0.1 until subject.thread_pool.size.zero?
     end
 
     it "returns an ACK and a response" do
@@ -84,8 +84,8 @@ describe ::Protobuf::Nats::Server do
       expect(client).to receive(:publish).once.ordered.with(inbox, response)
 
       # Wait for promise to finish executing.
-      promise = subject.execute_request_promise("", inbox)
-      promise.value
+      expect(subject.enqueue_request("", inbox)).to eq(true)
+      sleep 0.1 until subject.thread_pool.size.zero?
     end
   end
 end

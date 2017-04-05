@@ -21,6 +21,9 @@ class FakeNatsClient
   def publish(*)
   end
 
+  def flush
+  end
+
   def subscribe(subject, args, &block)
     subscriptions[subject] = block
   end

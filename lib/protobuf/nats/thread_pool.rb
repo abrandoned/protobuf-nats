@@ -44,6 +44,11 @@ module Protobuf
         @max_workers.times { @queue << [:stop, nil] }
       end
 
+      def kill
+        @shutting_down = true
+        @workers.map(&:kill)
+      end
+
       # This method is not thread safe by design since our IO model is a single producer thread
       # with multiple consumer threads.
       def wait_for_termination(seconds = nil)
@@ -59,6 +64,10 @@ module Protobuf
       # This callback is executed in a thread safe manner.
       def on_error(&cb)
         @error_cb = cb
+      end
+
+      def size
+        @active_work
       end
 
     private
