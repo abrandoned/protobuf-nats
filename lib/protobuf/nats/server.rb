@@ -28,7 +28,7 @@ module Protobuf
         ::Protobuf::Rpc::Service.implemented_services.map(&:safe_constantize)
       end
 
-      def execute_request_promise(request_data, reply_id)
+      def add_request_to_queue(request_data, reply_id)
         thread_pool.push do
           # Publish an ACK to signal the server has picked up the work.
           nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK)
@@ -39,8 +39,10 @@ module Protobuf
         end
       end
 
+      # This will work with both ruby and java errors
       def log_error(error)
-        logger.error error.to_s
+        logger.error error
+        logger.error error.class
         if error.respond_to?(:backtrace) && error.backtrace.is_a?(::Array)
           logger.error error.backtrace.join("\n")
         end
@@ -58,7 +60,7 @@ module Protobuf
             logger.info "  - #{subscription_key_and_queue}"
 
             subscriptions << nats.subscribe(subscription_key_and_queue, :queue => subscription_key_and_queue) do |request_data, reply_id, _subject|
-              unless execute_request_promise(request_data, reply_id)
+              unless add_request_to_queue(request_data, reply_id)
                 logger.error { "Thread pool is full! Dropping message for: #{subscription_key_and_queue}" }
               end
             end
@@ -67,21 +69,21 @@ module Protobuf
       end
 
       def run
-        # nats.on_reconnect do
-        #   logger.warn "Reconnected to NATS server!"
-        # end
+        nats.on_reconnect do
+          logger.warn "Reconnected to NATS server!"
+        end
 
-        # nats.on_disconnect do
-        #   logger.warn "Disconnected from NATS server!"
-        # end
+        nats.on_disconnect do
+          logger.warn "Disconnected from NATS server!"
+        end
 
-        # nats.on_error do |error|
-        #   log_error(error)
-        # end
+        nats.on_error do |error|
+          log_error(error)
+        end
 
-        # nats.on_close do
-        #   logger.warn "NATS connection was closed!"
-        # end
+        nats.on_close do
+          logger.warn "NATS connection was closed!"
+        end
 
         subscribe_to_services
 

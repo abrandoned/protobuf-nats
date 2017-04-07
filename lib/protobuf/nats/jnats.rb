@@ -21,6 +21,10 @@ module Protobuf
       end
 
       def initialize
+        @on_error_cb = lambda {|error|}
+        @on_reconnect_cb = lambda {}
+        @on_disconnect_cb = lambda {}
+        @on_close_cb = lambda {}
       end
 
       # def create_key_manager_factory(path, type)
@@ -41,6 +45,12 @@ module Protobuf
         # Basically never stop trying to connect
         connection_factory.setMaxReconnect(60_000)
 
+        # Setup callbacks
+        connection_factory.setDisconnectedCallback { |event| @on_disconnect_cb.call }
+        connection_factory.setReconnectedCallback { |_event| @on_reconnect_cb.call }
+        connection_factory.setClosedCallback { |_event| @on_close_cb.call }
+        connection_factory.setExceptionHandler { |error| @on_error_cb.call(error) }
+
         #  if options[:uses_tls]
         #   tls_client_cert_path = options[:tls_client_cert]
         #   tls_client_key_path = options[:tls_client_key]
@@ -48,24 +58,16 @@ module Protobuf
         #   tls_client_cert_is = java.io.FileInputStream.new(tls_client_cert_path)
         #   tls_client_key_is = java.io.FileInputStream.new(tls_client_key_path)
         #   tls_ca_cert_is = java.io.FileInputStream.new(tls_ca_cert_path)
-
         #   key_store_factory = javax.net.ssl.KeyManagerFactory.getInstance("X.509")
         #   fail "JVM does not support a key manager factory for X.509" if key_store.nil?
         #   cert_key_store.load(tls_client_cert_is, nil)
         #   cert_key_store.load(tls_client_key_is, nil)
         #   cert_key_store_factory.init(key_store, nil)
-
-
         #   trust_store_factory = javax.net.ssl.KeyManagerFactory.getInstance("X.509")
         #   fail "JVM does not support a trust manager factory for X.509" if trust_store.nil?
         #   trust_store.load(tls_client_cert_is, nil)
         #   trust_store.load(tls_client_trust_is, nil)
         #   trust_store_factory.init(trust_store, nil)
-
-
-
-
-
         #   key_store = java.security.KeyStore.getInstance("JKS")
         # end
 
@@ -122,6 +124,22 @@ module Protobuf
 
       def new_inbox
         "_INBOX.#{::SecureRandom.hex(13)}"
+      end
+
+      def on_reconnect(&cb)
+        @on_reconnect_cb = cb
+      end
+
+      def on_disconnect(&cb)
+        @on_disconnect_cb = cb
+      end
+
+      def on_error(&cb)
+        @on_error_cb = cb
+      end
+
+      def on_close(&cb)
+        @on_close_cb = cb
       end
     end
   end
