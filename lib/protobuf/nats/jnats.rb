@@ -13,7 +13,7 @@ module Protobuf
       def initialize
       end
 
-      def connect
+      def connect(*)
         @connection ||= ::Java::IoNatsClient::Nats.connect
       end
 
@@ -21,8 +21,12 @@ module Protobuf
         @connection.close
       end
 
-      def next_message(sub, timeout_ms)
-        sub.nextMsg(timeout_ms)
+      def flush(timeout_sec = 0.5)
+        @connection.flush(timeout_sec * 1000)
+      end
+
+      def next_message(sub, timeout_sec)
+        sub.nextMsg(timeout_sec * 1000)
       end
 
       def publish(subject, data, mailbox = nil)
@@ -34,8 +38,13 @@ module Protobuf
         queue = options[:queue]
         max = options[:max]
         sub = if block
-                @connection.subscribe(subject, queue) do |message|
-                  block.call(message.getData, message.getReplyTo, message.getSubject)
+                @connection.subscribeAsync(subject, queue) do |message|
+                  begin
+                    block.call(message.getData.to_s, message.getReplyTo, message.getSubject)
+                  rescue => error
+                    puts error
+                    puts error.backtrace.join("\n")
+                  end
                 end
               else
                 @connection.subscribeSync(subject, queue)
@@ -52,6 +61,10 @@ module Protobuf
         return if sub.nil?
         # The "true" here is to ignore and invalid conn.
         sub.unsubscribe(true)
+      end
+
+      def new_inbox
+        "_INBOX.#{::SecureRandom.hex(13)}"
       end
     end
   end

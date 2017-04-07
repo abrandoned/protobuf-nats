@@ -54,7 +54,7 @@ module Protobuf
         ack_condition = lock.new_cond
         pb_response_condition = lock.new_cond
         response = nil
-        sid = nats.subscribe(inbox, :max => 2) do |message|
+        sid = nats.subscribe(inbox, :max => 2) do |message, _, _|
           lock.synchronize do
             case message
             when ::Protobuf::Nats::Messages::ACK

@@ -22,6 +22,13 @@ module Protobuf
       ACK = "\1".freeze
     end
 
+    NatsClient = if defined? JRUBY_VERSION
+                   require "protobuf/nats/jnats"
+                   ::Protobuf::Nats::JNats
+                 else
+                   ::NATS::IO::Client
+                 end
+
     GET_CONNECTED_MUTEX = ::Mutex.new
 
     def self.config
@@ -46,7 +53,7 @@ module Protobuf
         GET_CONNECTED_MUTEX.synchronize do
           return if @start_client_nats_connection
 
-          @client_nats_connection = ::NATS::IO::Client.new
+          @client_nats_connection = NatsClient.new
           @client_nats_connection.connect(config.connection_options)
 
           # Ensure we have a valid connection to the NATS server.
@@ -55,6 +62,10 @@ module Protobuf
           true
         end
       end
+    end
+
+    at_exit do
+      ::Protobuf::Nats.client_nats_connection.close rescue nil
     end
 
   end
