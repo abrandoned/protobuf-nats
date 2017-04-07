@@ -19,7 +19,6 @@ module Protobuf
         @nats = options[:client] || ::Protobuf::Nats::NatsClient.new
         @nats.connect(::Protobuf::Nats.config.connection_options)
 
-        # @thread_pool = ::Concurrent::FixedThreadPool.new(options[:threads], :max_queue => options[:threads])
         @thread_pool = ::Protobuf::Nats::ThreadPool.new(options[:threads], :max_queue => options[:threads])
 
         @subscriptions = []
@@ -28,24 +27,6 @@ module Protobuf
       def service_klasses
         ::Protobuf::Rpc::Service.implemented_services.map(&:safe_constantize)
       end
-
-     #  def execute_request_promise(request_data, reply_id)
-     #    promise = ::Concurrent::Promise.new(:executor => thread_pool).then do
-     #      # Process request.
-     #      response_data = handle_request(request_data)
-     #      # Publish response.
-     #      nats.publish(reply_id, response_data)
-     #    end.on_error do |error|
-     #      log_error(error)
-     #    end.execute
-
-     #    # Publish an ACK to signal the server has picked up the work.
-     #    nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK)
-
-     #    promise
-     #  rescue ::Concurrent::RejectedExecutionError
-     #    nil
-     #  end
 
       def execute_request_promise(request_data, reply_id)
         thread_pool.push do

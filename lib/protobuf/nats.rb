@@ -4,7 +4,6 @@ require "protobuf"
 # We don't need this, but the CLI attempts to terminate.
 require "protobuf/rpc/service_directory"
 
-require "concurrent"
 require "nats/io/client"
 
 require "protobuf/nats/client"
