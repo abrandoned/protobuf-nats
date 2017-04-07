@@ -64,7 +64,6 @@ module Protobuf
           # Publish to server
           sub = nats.subscribe(inbox, :max => 2)
           nats.publish(subject, data, inbox)
-          nats.flush
 
           # Wait for reply
           first_message = nats.next_message(sub, ack_timeout)
