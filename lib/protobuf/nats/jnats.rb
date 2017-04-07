@@ -13,8 +13,16 @@ module Protobuf
       def initialize
       end
 
-      def connect(*)
-        @connection ||= ::Java::IoNatsClient::Nats.connect
+      def connect(options = {})
+        servers = options[:servers] || ["nats://localhost:4222"]
+        puts servers
+        servers = [servers].flatten.map { |uri_string| java.net.URI.new(uri_string) }
+        connection_factory = ::Java::IoNatsClient::ConnectionFactory.new
+        connection_factory.setServers(servers)
+        # Basically never stop trying to connect
+        connection_factory.setMaxReconnect(60_000)
+
+        @connection ||= connection_factory.createConnection
       end
 
       def close
@@ -69,4 +77,3 @@ module Protobuf
     end
   end
 end
-
