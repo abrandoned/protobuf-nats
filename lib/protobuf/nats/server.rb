@@ -16,7 +16,7 @@ module Protobuf
         @running = true
         @stopped = false
 
-        @nats = options[:client] || ::NATS::IO::Client.new
+        @nats = options[:client] || ::Protobuf::Nats::NatsClient.new
         @nats.connect(::Protobuf::Nats.config.connection_options)
 
         # @thread_pool = ::Concurrent::FixedThreadPool.new(options[:threads], :max_queue => options[:threads])
@@ -86,21 +86,21 @@ module Protobuf
       end
 
       def run
-        nats.on_reconnect do
-          logger.warn "Reconnected to NATS server!"
-        end
+        # nats.on_reconnect do
+        #   logger.warn "Reconnected to NATS server!"
+        # end
 
-        nats.on_disconnect do
-          logger.warn "Disconnected from NATS server!"
-        end
+        # nats.on_disconnect do
+        #   logger.warn "Disconnected from NATS server!"
+        # end
 
-        nats.on_error do |error|
-          log_error(error)
-        end
+        # nats.on_error do |error|
+        #   log_error(error)
+        # end
 
-        nats.on_close do
-          logger.warn "NATS connection was closed!"
-        end
+        # nats.on_close do
+        #   logger.warn "NATS connection was closed!"
+        # end
 
         subscribe_to_services
 
