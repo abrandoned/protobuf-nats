@@ -94,9 +94,10 @@ module Protobuf
               # Perform work
               cb.call
               # Update stats
-              @mutex.synchronize { @active_work -= 1 }
             rescue => error
               @cb_mutex.synchronize { @error_cb.call(error) }
+            ensure
+              @mutex.synchronize { @active_work -= 1 }
             end
           end
         end
