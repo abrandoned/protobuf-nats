@@ -27,16 +27,6 @@ module Protobuf
         @on_close_cb = lambda {}
       end
 
-      # def create_key_manager_factory(path, type)
-      #   key_store_factory = javax.net.ssl.KeyManagerFactory.getInstance(type)
-      #   path_input_stream = java.io.FileInputStream.new(path)
-      #   key_store = java.security.KeyStore.getInstance(type)
-      #   fail "JVM does not support a key manager factory for #{type}" if key_store.nil?
-      #   key_store.load(path_input_stream, nil)
-      #   key_store_factory.inti(key_store, nil)
-      #   key_store_factory
-      # end
-
       def connect(options = {})
         servers = options[:servers] || ["nats://localhost:4222"]
         servers = [servers].flatten.map { |uri_string| java.net.URI.new(uri_string) }
@@ -51,25 +41,12 @@ module Protobuf
         connection_factory.setClosedCallback { |_event| @on_close_cb.call }
         connection_factory.setExceptionHandler { |error| @on_error_cb.call(error) }
 
-        #  if options[:uses_tls]
-        #   tls_client_cert_path = options[:tls_client_cert]
-        #   tls_client_key_path = options[:tls_client_key]
-        #   tls_ca_cert_path = options[:tls_ca_cert]
-        #   tls_client_cert_is = java.io.FileInputStream.new(tls_client_cert_path)
-        #   tls_client_key_is = java.io.FileInputStream.new(tls_client_key_path)
-        #   tls_ca_cert_is = java.io.FileInputStream.new(tls_ca_cert_path)
-        #   key_store_factory = javax.net.ssl.KeyManagerFactory.getInstance("X.509")
-        #   fail "JVM does not support a key manager factory for X.509" if key_store.nil?
-        #   cert_key_store.load(tls_client_cert_is, nil)
-        #   cert_key_store.load(tls_client_key_is, nil)
-        #   cert_key_store_factory.init(key_store, nil)
-        #   trust_store_factory = javax.net.ssl.KeyManagerFactory.getInstance("X.509")
-        #   fail "JVM does not support a trust manager factory for X.509" if trust_store.nil?
-        #   trust_store.load(tls_client_cert_is, nil)
-        #   trust_store.load(tls_client_trust_is, nil)
-        #   trust_store_factory.init(trust_store, nil)
-        #   key_store = java.security.KeyStore.getInstance("JKS")
-        # end
+        # Setup ssl context if we're using tls
+        if options[:uses_tls]
+          ssl_context = create_ssl_context(options)
+          connection_factory.setSecure(true)
+          connection_factory.setSSLContext(ssl_context)
+        end
 
         @connection ||= connection_factory.createConnection
       end
@@ -140,6 +117,52 @@ module Protobuf
 
       def on_close(&cb)
         @on_close_cb = cb
+      end
+
+    private
+
+      # Jruby-openssl depends on bouncycastle so our lives don't suck super bad
+      def read_pem_object_from_file(path)
+        fail ::ArgumentError, "Tried to read a PEM key or cert with path nil" if path.nil?
+
+        file_reader = java.io.FileReader.new(path)
+        pem_parser = org.bouncycastle.openssl.PEMParser.new(file_reader)
+        object = pem_parser.readObject
+        pem_parser.close
+        object
+      end
+
+      def create_ssl_context(options)
+        # Create our certs and key converters to go from bouncycastle to java.
+        cert_converter = org.bouncycastle.cert.jcajce.JcaX509CertificateConverter.new
+        key_converter = org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter.new
+
+        # Load the certs and keys.
+        tls_ca_cert = cert_converter.getCertificate(read_pem_object_from_file(options[:tls_ca_cert]))
+        tls_client_cert = cert_converter.getCertificate(read_pem_object_from_file(options[:tls_client_cert]))
+        tls_client_key = key_converter.getKeyPair(read_pem_object_from_file(options[:tls_client_key]))
+
+        # Setup the CA cert.
+        ca_key_store = java.security.KeyStore.getInstance(java.security.KeyStore.getDefaultType)
+        ca_key_store.load(nil, nil)
+        ca_key_store.setCertificateEntry("ca-certificate", tls_ca_cert)
+        trust_manager = javax.net.ssl.TrustManagerFactory.getInstance(javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm)
+        trust_manager.init(ca_key_store)
+
+        # Setup the cert / key pair.
+        client_key_store = java.security.KeyStore.getInstance(java.security.KeyStore.getDefaultType)
+        client_key_store.load(nil, nil)
+        client_key_store.setCertificateEntry("certificate", tls_client_cert)
+        certificate_java_array = [tls_client_cert].to_java(java.security.cert.Certificate)
+        empty_password = [].to_java(:char)
+        client_key_store.setKeyEntry("private-key", tls_client_key.getPrivate, empty_password, certificate_java_array)
+        key_manager = javax.net.ssl.KeyManagerFactory.getInstance(javax.net.ssl.KeyManagerFactory.getDefaultAlgorithm)
+        key_manager.init(client_key_store, empty_password)
+
+        # Create ssl context.
+        context = javax.net.ssl.SSLContext.getInstance("TLSv1.2")
+        context.init(key_manager.getKeyManagers, trust_manager.getTrustManagers, nil)
+        context
       end
     end
   end
