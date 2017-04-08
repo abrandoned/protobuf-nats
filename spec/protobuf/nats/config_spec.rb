@@ -10,7 +10,11 @@ describe ::Protobuf::Nats::Config do
     subject.servers = ["nats://127.0.0.1:4222"]
     expected_options = {
       :servers => ["nats://127.0.0.1:4222"],
-      :connect_timeout => nil
+      :connect_timeout => nil,
+      :tls_ca_cert => nil,
+      :tls_client_cert => nil,
+      :tls_client_key => nil,
+      :uses_tls => false,
     }
     expect(subject.connection_options).to eq(expected_options)
   end
@@ -60,6 +64,18 @@ describe ::Protobuf::Nats::Config do
     expect(subject.servers).to eq(nil)
     expect(subject.uses_tls).to eq(false)
     expect(subject.connect_timeout).to eq(nil)
+
+    ENV["PROTOBUF_NATS_CONFIG_PATH"] = nil
+  end
+
+  it "adds the tls options to the connection options" do
+    ENV["PROTOBUF_NATS_CONFIG_PATH"] = "spec/support/protobuf_nats.yml"
+
+    subject.load_from_yml
+    connection_options = subject.connection_options
+    expect(connection_options[:tls_client_cert]).to eq("./spec/support/certs/client-cert.pem")
+    expect(connection_options[:tls_client_key]).to eq("./spec/support/certs/client-key.pem")
+    expect(connection_options[:tls_ca_cert]).to eq("./spec/support/certs/ca.pem")
 
     ENV["PROTOBUF_NATS_CONFIG_PATH"] = nil
   end
