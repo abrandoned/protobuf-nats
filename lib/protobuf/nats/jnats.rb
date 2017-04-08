@@ -5,6 +5,11 @@ require ::File.join(ext_base, "jars/slf4j-simple-1.7.25.jar")
 require ::File.join(ext_base, "jars/gson-2.6.2.jar")
 require ::File.join(ext_base, "jars/jnats-1.1-SNAPSHOT.jar")
 
+# Set field accessors so we can access the member variables directly.
+class Java::IoNatsClient::SubscriptionImpl
+  field_accessor :pMsgs, :pBytes, :delivered
+end
+
 module Protobuf
   module Nats
     class JNats
@@ -25,6 +30,8 @@ module Protobuf
         @on_reconnect_cb = lambda {}
         @on_disconnect_cb = lambda {}
         @on_close_cb = lambda {}
+        @subz_cbs = {}
+        @subz_mutex = ::Mutex.new
       end
 
       def connect(options = {})
@@ -48,11 +55,18 @@ module Protobuf
           connection_factory.setSSLContext(ssl_context)
         end
 
-        @connection ||= connection_factory.createConnection
+        @connection = connection_factory.createConnection
+
+        # Spawn our consumer thread
+        @work_queue = @connection.createMsgChannel
+        spawn_consumer
+
+        @connection
       end
 
       def close
         @connection.close
+        @consumer.kill rescue nil
       end
 
       def flush(timeout_sec = 0.5)
@@ -73,28 +87,36 @@ module Protobuf
       def subscribe(subject, options = {}, &block)
         queue = options[:queue]
         max = options[:max]
-        sub = if block
-                @connection.subscribeAsync(subject, queue) do |message|
-                  begin
-                    block.call(message.getData.to_s, message.getReplyTo, message.getSubject)
-                  rescue => error
-                    puts error
-                    puts error.backtrace.join("\n")
-                  end
-                end
-              else
-                @connection.subscribeSync(subject, queue)
-              end
+        work_queue = nil
+        # We pass our work queue for processing async work because java nats
+        # uses a cahced thread pool: 1 thread per async subscription.
+        # Sync subs need their own queue so work is not processed async.
+        work_queue = block.nil? ? @connection.createMsgChannel : @work_queue
+        sub = @connection.subscribe(subject, queue, nil, work_queue)
 
-        if max
-          sub.autoUnsubscribe(max)
+        # Register the block callback. We only lock to save the callback.
+        if block
+          @subz_mutex.synchronize do
+            @subz_cbs[sub.getSid] = block
+          end
         end
+
+        # Auto unsub if max message option was provided.
+        sub.autoUnsubscribe(max) if max
 
         sub
       end
 
       def unsubscribe(sub)
         return if sub.nil?
+
+        # Cleanup our async callback
+        if @subz_cbs[sub.getSid]
+          @subz_mutex.synchronize do
+            @subz_cbs.delete(sub.getSid)
+          end
+        end
+
         # The "true" here is to ignore and invalid conn.
         sub.unsubscribe(true)
       end
@@ -120,6 +142,37 @@ module Protobuf
       end
 
     private
+
+      # TODO: We should probably farm this guy out to a java thread pool executor.
+      def spawn_consumer
+        @consumer = ::Thread.new do
+          loop do
+            begin
+              # TODO: We should probably poll here and let the close wait for work to finish.
+              message = @work_queue.take
+              next unless message
+              sub = message.getSubscription
+
+              # We have to update the subscription stats so we're not considered a slow consumer.
+              begin
+                sub.lock
+                sub.pMsgs -= 1
+                sub.pBytes -= message.getData.length if message.getData
+                sub.delivered += 1 unless sub.isClosed
+              ensure
+                sub.unlock
+              end
+
+              # We don't need t
+              callback = @subz_cbs[sub.getSid]
+              next unless callback
+              callback.call(message.getData.to_s, message.getReplyTo, message.getSubject)
+            rescue => error
+              @on_error_cb.call(error)
+            end
+          end
+        end
+      end
 
       # Jruby-openssl depends on bouncycastle so our lives don't suck super bad
       def read_pem_object_from_file(path)

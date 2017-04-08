@@ -36,7 +36,7 @@ module Protobuf
             # Publish response.
             nats.publish(reply_id, response_data)
           rescue => error
-            log_error(error)
+            ::Protobuf::Nats.log_error(error)
           end
         end
 
@@ -44,15 +44,6 @@ module Protobuf
         nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK) if was_enqueued
 
         was_enqueued
-      end
-
-      # This will work with both ruby and java errors
-      def log_error(error)
-        logger.error error.to_s
-        logger.error error.class.to_s
-        if error.respond_to?(:backtrace) && error.backtrace.is_a?(::Array)
-          logger.error error.backtrace.join("\n")
-        end
       end
 
       def subscribe_to_services
@@ -85,7 +76,7 @@ module Protobuf
         end
 
         nats.on_error do |error|
-          log_error(error)
+          ::Protobuf::Nats.log_error(error)
         end
 
         nats.on_close do

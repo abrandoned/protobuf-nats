@@ -28,6 +28,8 @@ module Protobuf
                    ::NATS::IO::Client
                  end
 
+    puts "Using #{NatsClient} to connect"
+
     GET_CONNECTED_MUTEX = ::Mutex.new
 
     def self.config
@@ -58,8 +60,21 @@ module Protobuf
           # Ensure we have a valid connection to the NATS server.
           @client_nats_connection.flush(5)
 
+          @client_nats_connection.on_error do |error|
+            log_error(error)
+          end
+
           true
         end
+      end
+    end
+
+    # This will work with both ruby and java errors
+    def self.log_error(error)
+      logger.error error.to_s
+      logger.error error.class.to_s
+      if error.respond_to?(:backtrace) && error.backtrace.is_a?(::Array)
+        logger.error error.backtrace.join("\n")
       end
     end
 
