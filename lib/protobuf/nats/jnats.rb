@@ -57,15 +57,17 @@ module Protobuf
 
         @connection = connection_factory.createConnection
 
-        # Spawn our consumer thread
+        # We're going to spawn a consumer and supervisor
         @work_queue = @connection.createMsgChannel
-        spawn_consumer
+        spwan_supervisor_and_consumer
 
         @connection
       end
 
+      # Do not depend on #close for a greaceful disconnect.
       def close
         @connection.close
+        @supervisor.kill rescue nil
         @consumer.kill rescue nil
       end
 
@@ -143,12 +145,23 @@ module Protobuf
 
     private
 
-      # TODO: We should probably farm this guy out to a java thread pool executor.
+      def spwan_supervisor_and_consumer
+        spawn_consumer
+        @supervisor = ::Thread.new do
+          loop do
+            sleep 1
+            next if @consumer && @consumer.alive?
+            # We need to recreate the consumer thread
+            @consumer.kill if @consumer
+            spawn_consumer
+          end
+        end
+      end
+
       def spawn_consumer
         @consumer = ::Thread.new do
           loop do
             begin
-              # TODO: We should probably poll here and let the close wait for work to finish.
               message = @work_queue.take
               next unless message
               sub = message.getSubscription
