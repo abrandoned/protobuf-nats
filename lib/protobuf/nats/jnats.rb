@@ -149,11 +149,15 @@ module Protobuf
         spawn_consumer
         @supervisor = ::Thread.new do
           loop do
-            sleep 1
-            next if @consumer && @consumer.alive?
-            # We need to recreate the consumer thread
-            @consumer.kill if @consumer
-            spawn_consumer
+            begin
+              sleep 1
+              next if @consumer && @consumer.alive?
+              # We need to recreate the consumer thread
+              @consumer.kill if @consumer
+              spawn_consumer
+            rescue => error
+              @on_error_cb.call(error)
+            end
           end
         end
       end
