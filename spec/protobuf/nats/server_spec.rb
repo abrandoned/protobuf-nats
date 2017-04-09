@@ -31,22 +31,6 @@ describe ::Protobuf::Nats::Server do
     end
   end
 
-  describe "#log_error" do
-    it "does not log an error with a backtrace" do
-      expect(logger).to receive(:error).with("yolo")
-      expect(logger).to_not receive(:error).with("")
-      ::Protobuf::Nats.log_error(::ArgumentError.new("yolo"))
-    end
-
-    it "logs errors with backtrace" do
-      error = ::ArgumentError.new("yolo")
-      allow(error).to receive(:backtrace).and_return(["line 1", "line 2"])
-      expect(logger).to receive(:error).with("yolo")
-      expect(logger).to_not receive(:error).with("line 1\nline2")
-      ::Protobuf::Nats.log_error(error)
-    end
-  end
-
   describe "#enqueue_request" do
     it "returns false when the thread pool and thread pool queue is full" do
       # Fill the thread pool.
