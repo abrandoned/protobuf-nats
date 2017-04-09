@@ -32,6 +32,7 @@ module Protobuf
 
     GET_CONNECTED_MUTEX = ::Mutex.new
 
+
     def self.config
       @config ||= begin
         config = ::Protobuf::Nats::Config.new
@@ -76,6 +77,10 @@ module Protobuf
       if error.respond_to?(:backtrace) && error.backtrace.is_a?(::Array)
         logger.error error.backtrace.join("\n")
       end
+    end
+
+    def self.logger
+      ::Protobuf::Logging.logger
     end
 
     at_exit do
