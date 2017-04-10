@@ -44,7 +44,7 @@ describe ::Protobuf::Nats::Client do
     it "raises an error when the ack is not signaled" do
       client.schedule_messages([::FakeNatsClient::Message.new(inbox, response, 0.05)])
 
-      options = {:ack_timeout => 0.1}
+      options = {:ack_timeout => 0.1, :timeout => 0.2}
       expect { subject.nats_request_with_two_responses(msg_subject, "request data", options) }.to raise_error(::NATS::IO::Timeout)
     end
 

@@ -4,7 +4,6 @@ require "protobuf"
 # We don't need this, but the CLI attempts to terminate.
 require "protobuf/rpc/service_directory"
 
-require "concurrent"
 require "nats/io/client"
 
 require "protobuf/nats/client"
@@ -21,6 +20,13 @@ module Protobuf
     module Messages
       ACK = "\1".freeze
     end
+
+    NatsClient = if defined? JRUBY_VERSION
+                   require "protobuf/nats/jnats"
+                   ::Protobuf::Nats::JNats
+                 else
+                   ::NATS::IO::Client
+                 end
 
     GET_CONNECTED_MUTEX = ::Mutex.new
 
@@ -46,15 +52,38 @@ module Protobuf
         GET_CONNECTED_MUTEX.synchronize do
           return if @start_client_nats_connection
 
-          @client_nats_connection = ::NATS::IO::Client.new
+          @client_nats_connection = NatsClient.new
           @client_nats_connection.connect(config.connection_options)
 
           # Ensure we have a valid connection to the NATS server.
           @client_nats_connection.flush(5)
 
+          @client_nats_connection.on_error do |error|
+            log_error(error)
+          end
+
           true
         end
       end
+    end
+
+    # This will work with both ruby and java errors
+    def self.log_error(error)
+      logger.error error.to_s
+      logger.error error.class.to_s
+      if error.respond_to?(:backtrace) && error.backtrace.is_a?(::Array)
+        logger.error error.backtrace.join("\n")
+      end
+    end
+
+    def self.logger
+      ::Protobuf::Logging.logger
+    end
+
+    logger.info "Using #{NatsClient} to connect"
+
+    at_exit do
+      ::Protobuf::Nats.client_nats_connection.close rescue nil
     end
 
   end

@@ -4,7 +4,7 @@ require "yaml"
 module Protobuf
   module Nats
     class Config
-      attr_accessor :uses_tls, :servers, :connect_timeout, :tls_client_cert, :tls_client_key
+      attr_accessor :uses_tls, :servers, :connect_timeout, :tls_client_cert, :tls_client_key, :tls_ca_cert
 
       CONFIG_MUTEX = ::Mutex.new
 
@@ -13,6 +13,7 @@ module Protobuf
         :servers => nil,
         :tls_client_cert => nil,
         :tls_client_key => nil,
+        :tls_ca_cert => nil,
         :uses_tls => false,
       }.freeze
 
@@ -53,6 +54,10 @@ module Protobuf
         @connection_options ||= begin
           options = {
             servers: servers,
+            uses_tls: uses_tls,
+            tls_client_cert: tls_client_cert,
+            tls_client_key: tls_client_key,
+            tls_ca_cert: tls_ca_cert,
             connect_timeout: connect_timeout
           }
           options[:tls] = {:context => new_tls_context} if uses_tls

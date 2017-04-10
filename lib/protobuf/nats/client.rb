@@ -44,55 +44,106 @@ module Protobuf
         end
       end
 
-      # This is a request that expects two responses.
-      # 1. An ACK from the server. We use a shorter timeout.
-      # 2. A PB message from the server. We use a longer timoeut.
-      def nats_request_with_two_responses(subject, data, opts)
-        nats = Protobuf::Nats.client_nats_connection
-        inbox = nats.new_inbox
-        lock = ::Monitor.new
-        ack_condition = lock.new_cond
-        pb_response_condition = lock.new_cond
-        response = nil
-        sid = nats.subscribe(inbox, :max => 2) do |message|
-          lock.synchronize do
-            case message
-            when ::Protobuf::Nats::Messages::ACK
-              ack_condition.signal
-              next
-            else
-              response = message
-              pb_response_condition.signal
-            end
-          end
-        end
+      # The Java nats client offers better message queueing so we're going to use
+      # that over locking ourselves. This split in code isn't great, but we can
+      # refactor this later.
+      if defined? JRUBY_VERSION
 
-        lock.synchronize do
-          # Publish to server
-          nats.publish(subject, data, inbox)
-
+        # This is a request that expects two responses.
+        # 1. An ACK from the server. We use a shorter timeout.
+        # 2. A PB message from the server. We use a longer timoeut.
+        def nats_request_with_two_responses(subject, data, opts)
           # Wait for the ACK from the server
           ack_timeout = opts[:ack_timeout] || 5
-          with_timeout(ack_timeout) { ack_condition.wait(ack_timeout) }
-
           # Wait for the protobuf response
           timeout = opts[:timeout] || 60
-          with_timeout(timeout) { pb_response_condition.wait(timeout) } unless response
+
+          nats = ::Protobuf::Nats.client_nats_connection
+          inbox = nats.new_inbox
+
+          # Publish to server
+          sub = nats.subscribe(inbox, :max => 2)
+          nats.publish(subject, data, inbox)
+
+          # Wait for reply
+          first_message = nats.next_message(sub, ack_timeout)
+          fail ::NATS::IO::Timeout if first_message.nil?
+          second_message = nats.next_message(sub, timeout)
+          fail ::NATS::IO::Timeout if second_message.nil?
+
+          # Check messages
+          response = nil
+          has_ack = false
+          case first_message.data
+          when ::Protobuf::Nats::Messages::ACK then has_ack = true
+          else response = first_message.data
+          end
+          case second_message.data
+          when ::Protobuf::Nats::Messages::ACK then has_ack = true
+          else response = second_message.data
+          end
+
+          success = has_ack && response
+          fail ::NATS::IO::Timeout unless success
+
+          response
+        ensure
+          # Ensure we don't leave a subscriptiosn sitting around.
+          # This also cleans up memory. It's a no-op if the subscription
+          # is already cleaned up.
+          nats.unsubscribe(sub)
         end
 
-        response
-      ensure
-        # Ensure we don't leave a subscription sitting around.
-        nats.unsubscribe(sid) if response.nil?
-      end
+      else
 
-      # This is a copy of #with_nats_timeout
-      def with_timeout(timeout)
-        start_time = ::NATS::MonotonicTime.now
-        yield
-        end_time = ::NATS::MonotonicTime.now
-        duration = end_time - start_time
-        raise ::NATS::IO::Timeout.new("nats: timeout") if duration > timeout
+        def nats_request_with_two_responses(subject, data, opts)
+          nats = Protobuf::Nats.client_nats_connection
+          inbox = nats.new_inbox
+          lock = ::Monitor.new
+          ack_condition = lock.new_cond
+          pb_response_condition = lock.new_cond
+          response = nil
+          sid = nats.subscribe(inbox, :max => 2) do |message, _, _|
+            lock.synchronize do
+              case message
+              when ::Protobuf::Nats::Messages::ACK
+                ack_condition.signal
+                next
+              else
+                response = message
+                pb_response_condition.signal
+              end
+            end
+          end
+
+          lock.synchronize do
+            # Publish to server
+            nats.publish(subject, data, inbox)
+
+            # Wait for the ACK from the server
+            ack_timeout = opts[:ack_timeout] || 5
+            with_timeout(ack_timeout) { ack_condition.wait(ack_timeout) }
+
+            # Wait for the protobuf response
+            timeout = opts[:timeout] || 60
+            with_timeout(timeout) { pb_response_condition.wait(timeout) } unless response
+          end
+
+          response
+        ensure
+          # Ensure we don't leave a subscription sitting around.
+          nats.unsubscribe(sid) if response.nil?
+        end
+
+        # This is a copy of #with_nats_timeout
+        def with_timeout(timeout)
+          start_time = ::NATS::MonotonicTime.now
+          yield
+          end_time = ::NATS::MonotonicTime.now
+          duration = end_time - start_time
+          raise ::NATS::IO::Timeout.new("nats: timeout") if duration > timeout
+        end
+
       end
 
     end

@@ -31,49 +31,34 @@ describe ::Protobuf::Nats::Server do
     end
   end
 
-  describe "#log_error" do
-    it "does not log an error with a backtrace" do
-      expect(subject.logger).to receive(:error).with("yolo")
-      expect(subject.logger).to_not receive(:error).with("")
-      subject.log_error(::ArgumentError.new("yolo"))
-    end
-
-    it "logs errors with backtrace" do
-      error = ::ArgumentError.new("yolo")
-      allow(error).to receive(:backtrace).and_return(["line 1", "line 2"])
-      expect(subject.logger).to receive(:error).with("yolo")
-      expect(subject.logger).to_not receive(:error).with("line 1\nline2")
-      subject.log_error(error)
-    end
-  end
-
-  describe "execute_request_promise" do
-    it "returns nil when the thread pool and thread pool queue is full" do
+  describe "#enqueue_request" do
+    it "returns false when the thread pool and thread pool queue is full" do
       # Fill the thread pool.
-      2.times { subject.thread_pool << lambda { sleep 1 } }
+      2.times { subject.thread_pool.push { sleep 1 } }
       # Fill the thread pool queue.
-      2.times { subject.thread_pool << lambda { sleep 1 } }
-      expect(subject.execute_request_promise("", "")).to eq(nil)
+      2.times { subject.thread_pool.push { sleep 1 } }
+      expect(subject.enqueue_request("", "")).to eq(false)
     end
 
     it "sends an ACK if the thread pool enqueued the task" do
       # Fill the thread pool.
-      2.times { subject.thread_pool << lambda { sleep 1 } }
+      2.times { subject.thread_pool.push { sleep 1 } }
       expect(subject.nats).to receive(:publish).with("inbox_123", ::Protobuf::Nats::Messages::ACK)
       # Wait for promise to finish executing.
-      promise = subject.execute_request_promise("", "inbox_123")
+      expect(subject.enqueue_request("", "inbox_123")).to eq(true)
       subject.thread_pool.kill
     end
 
-    it "logs any error that is raised within the request promise chain" do
+    it "logs any error that is raised within the request block" do
       request_data = "yolo"
-      expect(subject).to receive(:handle_request).with(request_data).and_raise(::RuntimeError)
+      expect(subject).to receive(:handle_request).with(request_data).and_raise(::RuntimeError, "mah error")
+      expect(logger).to receive(:error).once.ordered.with("mah error")
       expect(logger).to receive(:error).once.ordered.with("RuntimeError")
       expect(logger).to receive(:error).once.ordered
 
       # Wait for promise to finish executing.
-      promise = subject.execute_request_promise(request_data, "inbox_123")
-      promise.value
+      expect(subject.enqueue_request(request_data, "inbox_123")).to eq(true)
+      sleep 0.1 until subject.thread_pool.size.zero?
     end
 
     it "returns an ACK and a response" do
@@ -84,8 +69,8 @@ describe ::Protobuf::Nats::Server do
       expect(client).to receive(:publish).once.ordered.with(inbox, response)
 
       # Wait for promise to finish executing.
-      promise = subject.execute_request_promise("", inbox)
-      promise.value
+      expect(subject.enqueue_request("", inbox)).to eq(true)
+      sleep 0.1 until subject.thread_pool.size.zero?
     end
   end
 end

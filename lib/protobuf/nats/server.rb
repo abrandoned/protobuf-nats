@@ -1,6 +1,7 @@
 require "active_support/core_ext/class/subclasses"
 require "protobuf/rpc/server"
 require "protobuf/rpc/service"
+require "protobuf/nats/thread_pool"
 
 module Protobuf
   module Nats
@@ -15,10 +16,10 @@ module Protobuf
         @running = true
         @stopped = false
 
-        @nats = options[:client] || ::NATS::IO::Client.new
+        @nats = options[:client] || ::Protobuf::Nats::NatsClient.new
         @nats.connect(::Protobuf::Nats.config.connection_options)
 
-        @thread_pool = ::Concurrent::FixedThreadPool.new(options[:threads], :max_queue => options[:threads])
+        @thread_pool = ::Protobuf::Nats::ThreadPool.new(options[:threads], :max_queue => options[:threads])
 
         @subscriptions = []
       end
@@ -27,29 +28,22 @@ module Protobuf
         ::Protobuf::Rpc::Service.implemented_services.map(&:safe_constantize)
       end
 
-      def execute_request_promise(request_data, reply_id)
-        promise = ::Concurrent::Promise.new(:executor => thread_pool).then do
-          # Process request.
-          response_data = handle_request(request_data)
-          # Publish response.
-          nats.publish(reply_id, response_data)
-        end.on_error do |error|
-          log_error(error)
-        end.execute
+      def enqueue_request(request_data, reply_id)
+        was_enqueued = thread_pool.push do
+          begin
+            # Process request.
+            response_data = handle_request(request_data)
+            # Publish response.
+            nats.publish(reply_id, response_data)
+          rescue => error
+            ::Protobuf::Nats.log_error(error)
+          end
+        end
 
         # Publish an ACK to signal the server has picked up the work.
-        nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK)
+        nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK) if was_enqueued
 
-        promise
-      rescue ::Concurrent::RejectedExecutionError
-        nil
-      end
-
-      def log_error(error)
-        logger.error error.to_s
-        if error.respond_to?(:backtrace) && error.backtrace.is_a?(::Array)
-          logger.error error.backtrace.join("\n")
-        end
+        was_enqueued
       end
 
       def subscribe_to_services
@@ -64,7 +58,7 @@ module Protobuf
             logger.info "  - #{subscription_key_and_queue}"
 
             subscriptions << nats.subscribe(subscription_key_and_queue, :queue => subscription_key_and_queue) do |request_data, reply_id, _subject|
-              unless execute_request_promise(request_data, reply_id)
+              unless enqueue_request(request_data, reply_id)
                 logger.error { "Thread pool is full! Dropping message for: #{subscription_key_and_queue}" }
               end
             end
@@ -82,7 +76,7 @@ module Protobuf
         end
 
         nats.on_error do |error|
-          log_error(error)
+          ::Protobuf::Nats.log_error(error)
         end
 
         nats.on_close do

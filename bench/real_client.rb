@@ -4,10 +4,6 @@ ENV["PB_SERVER_TYPE"] = "protobuf/nats/runner"
 require "benchmark/ips"
 require "./examples/warehouse/app"
 
-payload = ::Warehouse::Shipment.new(:guid => ::SecureRandom.uuid, :address => "123 yolo st")
-nats = ::NATS::IO::Client.new
-nats.connect({:servers => ["nats://127.0.0.1:4222"]})
-
 Protobuf::Logging.logger = ::Logger.new(nil)
 
 Benchmark.ips do |config|
