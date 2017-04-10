@@ -28,10 +28,7 @@ module Protobuf
                    ::NATS::IO::Client
                  end
 
-    puts "Using #{NatsClient} to connect"
-
     GET_CONNECTED_MUTEX = ::Mutex.new
-
 
     def self.config
       @config ||= begin
@@ -82,6 +79,8 @@ module Protobuf
     def self.logger
       ::Protobuf::Logging.logger
     end
+
+    logger.info "Using #{NatsClient} to connect"
 
     at_exit do
       ::Protobuf::Nats.client_nats_connection.close rescue nil
