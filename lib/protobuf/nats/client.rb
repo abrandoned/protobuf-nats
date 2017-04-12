@@ -84,7 +84,7 @@ module Protobuf
           end
 
           success = has_ack && response
-          fail ::NATS::IO::Timeout unless success
+          fail(::NATS::IO::Timeout, subject) unless success
 
           response
         ensure
