@@ -67,8 +67,11 @@ module Protobuf
       # Do not depend on #close for a greaceful disconnect.
       def close
         @connection.close
+        @connection = nil
         @supervisor.kill rescue nil
+        @supervisor = nil
         @consumer.kill rescue nil
+        @supervisor = nil
       end
 
       def flush(timeout_sec = 0.5)
