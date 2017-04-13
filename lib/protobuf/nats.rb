@@ -50,7 +50,8 @@ module Protobuf
     def self.start_client_nats_connection
       @start_client_nats_connection ||= begin
         GET_CONNECTED_MUTEX.synchronize do
-          return if @start_client_nats_connection
+          break true if @client_nats_connection
+          break true if @start_client_nats_connection
 
           @client_nats_connection = NatsClient.new
           @client_nats_connection.connect(config.connection_options)
