@@ -28,10 +28,15 @@ module Protobuf
       rescue => error
         logger.debug { sign_message("Server failed request (invoking on_failure): #{error.inspect}") }
 
-        if @failure_cb
-          @failure_cb.call(error)
-        else
-          raise
+        begin
+          if @failure_cb
+            @failure_cb.call(error)
+          else
+            raise
+          end
+        ensure
+          # Complete stats and log
+          complete
         end
       end
 
