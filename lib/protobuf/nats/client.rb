@@ -33,8 +33,6 @@ module Protobuf
         else
           raise
         end
-      ensure
-        complete
       end
 
       def send_request
