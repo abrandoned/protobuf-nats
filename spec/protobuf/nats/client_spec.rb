@@ -65,7 +65,20 @@ describe ::Protobuf::Nats::Client do
   end
 
   describe "#send_request" do
-    it "retries 3 times when a NAT timeout is raised" do
+    it "retries 3 times and invokes error callback" do
+      expect(subject).to receive(:setup_connection).exactly(3).times
+      expect(subject).to receive(:nats_request_with_two_responses).and_raise(::NATS::IO::Timeout).exactly(3).times
+
+      error = nil
+      subject.failure_cb = lambda do |rpc_error|
+        error = rpc_error
+      end
+      subject.send_request
+
+      expect(error.class).to eq(::NATS::IO::Timeout)
+    end
+
+    it "retries 3 times when and raises a NATS timeout when no error callback is provided" do
       expect(subject).to receive(:setup_connection).exactly(3).times
       expect(subject).to receive(:nats_request_with_two_responses).and_raise(::NATS::IO::Timeout).exactly(3).times
       expect { subject.send_request }.to raise_error(::NATS::IO::Timeout)

@@ -21,17 +21,37 @@ module Protobuf
         @subscription_key_cache ||= {}
       end
 
-      def send_request
-        retries ||= 3
+      # This is an alternative to depending on #failure for invoking the error callback.
+      # We never want to silence an error in the event that no callback is provided.
+      def failure_handler
+        yield
+      rescue => error
+        logger.debug { sign_message("Server failed request (invoking on_failure): #{error.inspect}") }
 
-        setup_connection
-        request_options = {:timeout => 60, :ack_timeout => 5}
-        @response_data = nats_request_with_two_responses(cached_subscription_key, @request_data, request_options)
-        parse_response
-      rescue ::NATS::IO::Timeout
-        # Nats response timeout.
-        retry if (retries -= 1) > 0
-        raise
+        if @failure_cb
+          @failure_cb.call(error)
+        else
+          raise
+        end
+      ensure
+        complete
+      end
+
+      def send_request
+        failure_handler do
+          begin
+            retries ||= 3
+
+            setup_connection
+            request_options = {:timeout => 60, :ack_timeout => 5}
+            @response_data = nats_request_with_two_responses(cached_subscription_key, @request_data, request_options)
+            parse_response
+          rescue ::NATS::IO::Timeout
+            # Nats response timeout.
+            retry if (retries -= 1) > 0
+            raise
+          end
+        end
       end
 
       def cached_subscription_key
