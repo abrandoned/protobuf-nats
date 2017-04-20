@@ -54,8 +54,16 @@ module Protobuf
           break true if @client_nats_connection
           break true if @start_client_nats_connection
 
-          @client_nats_connection = NatsClient.new
-          @client_nats_connection.connect(config.connection_options)
+          # Disable publisher pending buffer on reconnect
+          options = config.connection_options.merge(:disable_reconnect_buffer => true)
+
+          begin
+            @client_nats_connection = NatsClient.new
+            @client_nats_connection.connect(options)
+          rescue ::Protobuf::Nats::Errors::IOException
+            @client_nats_connection = nil
+            raise
+          end
 
           # Ensure we have a valid connection to the NATS server.
           @client_nats_connection.flush(5)
