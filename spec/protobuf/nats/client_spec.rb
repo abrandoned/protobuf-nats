@@ -128,7 +128,7 @@ describe ::Protobuf::Nats::Client do
       expect { subject.send_request }.to raise_error(::NATS::IO::Timeout)
     end
 
-    it "waits an ack_timeout duration when the nats connection is reconnecting" do
+    it "waits the reconnect_delay duration when the nats connection is reconnecting" do
       error = ::Protobuf::Nats::Errors::IOException.new
       client = ::FakeNatsClient.new
       allow(::Protobuf::Nats).to receive(:client_nats_connection).and_return(client)
