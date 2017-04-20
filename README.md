@@ -21,6 +21,20 @@ Or install it yourself as:
 
 ## Configuring
 
+### Environment Variables
+
+You can also use the following environment variables to tune parameters:
+
+`PB_NATS_SERVER_MAX_QUEUE_SIZE` - The size of the queue in front of your thread pool (default: thread count passed to CLI)
+
+`PB_NATS_CLIENT_ACK_TIMEOUT` - Seconds to wait for an ACK from the rpc server (default: 5 seconds)
+
+`PB_NATS_CLIENT_RESPONSE_TIMEOUT` - Seconds to wait for a non-ACK response from the rpc server (default: 60 seconds)
+
+`PROTOBUF_NATS_CONFIG_PATH` - Custom path to the config yaml (default: "config/protobuf_nats.yml")
+
+### YAML Config
+
 The client and server are configured via environment variables defined in the `pure-ruby-nats` gem. However, there are a
 few params which cannot be set: `servers`, `uses_tls` and `connect_timeout`, so those my be defined in a yml file.
 

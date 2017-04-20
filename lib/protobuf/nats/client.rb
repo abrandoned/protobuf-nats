@@ -40,13 +40,29 @@ module Protobuf
         end
       end
 
+      def ack_timeout
+        @ack_timeout ||= if ::ENV.key?("PB_NATS_CLIENT_ACK_TIMEOUT")
+          ::ENV["PB_NATS_CLIENT_ACK_TIMEOUT"].to_i
+        else
+          5
+        end
+      end
+
+      def response_timeout
+        @response_timeout ||= if ::ENV.key?("PB_NATS_CLIENT_RESPONSE_TIMEOUT")
+          ::ENV["PB_NATS_CLIENT_RESPONSE_TIMEOUT"].to_i
+        else
+          60
+        end
+      end
+
       def send_request
         failure_handler do
           begin
             retries ||= 3
 
             setup_connection
-            request_options = {:timeout => 60, :ack_timeout => 5}
+            request_options = {:timeout => response_timeout, :ack_timeout => ack_timeout}
             @response_data = nats_request_with_two_responses(cached_subscription_key, @request_data, request_options)
             parse_response
           rescue ::NATS::IO::Timeout
@@ -112,8 +128,6 @@ module Protobuf
           response
         ensure
           # Ensure we don't leave a subscriptiosn sitting around.
-          # This also cleans up memory. It's a no-op if the subscription
-          # is already cleaned up.
           nats.unsubscribe(sub)
         end
 

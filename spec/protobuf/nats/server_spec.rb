@@ -24,6 +24,20 @@ describe ::Protobuf::Nats::Server do
     allow(subject).to receive(:service_klasses).and_return([SomeRandomService])
   end
 
+  describe "#max_queue_size" do
+    it "can be set via options hash" do
+      expect(subject.max_queue_size).to eq(2)
+    end
+
+    it "can be set via PB_NATS_SERVER_MAX_QUEUE_SIZE environment variable" do
+      ::ENV["PB_NATS_SERVER_MAX_QUEUE_SIZE"] = "10"
+
+      expect(subject.max_queue_size).to eq(10)
+
+      ::ENV.delete("PB_NATS_SERVER_MAX_QUEUE_SIZE")
+    end
+  end
+
   describe "#subscribe_to_services" do
     it "subscribes to services that inherit from protobuf rpc service" do
       subject.subscribe_to_services

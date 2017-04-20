@@ -59,6 +59,18 @@ module Protobuf
           # Ensure we have a valid connection to the NATS server.
           @client_nats_connection.flush(5)
 
+          @client_nats_connection.on_disconnect do
+            logger.warn("Client NATS connection was disconnected")
+          end
+
+          @client_nats_connection.on_reconnect do
+            logger.warn("Client NATS connection was reconnected")
+          end
+
+          @client_nats_connection.on_close do
+            logger.warn("Client NATS connection was closed")
+          end
+
           @client_nats_connection.on_error do |error|
             log_error(error)
           end
