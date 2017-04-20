@@ -16,12 +16,20 @@ module Protobuf
         @running = true
         @stopped = false
 
-        @nats = options[:client] || ::Protobuf::Nats::NatsClient.new
+        @nats = @options[:client] || ::Protobuf::Nats::NatsClient.new
         @nats.connect(::Protobuf::Nats.config.connection_options)
 
-        @thread_pool = ::Protobuf::Nats::ThreadPool.new(options[:threads], :max_queue => options[:threads])
+        @thread_pool = ::Protobuf::Nats::ThreadPool.new(@options[:threads], :max_queue => max_queue_size)
 
         @subscriptions = []
+      end
+
+      def max_queue_size
+        if ::ENV.key?("PB_NATS_SERVER_MAX_QUEUE_SIZE")
+          ::ENV["PB_NATS_SERVER_MAX_QUEUE_SIZE"].to_i
+        else
+          @options[:threads]
+        end
       end
 
       def service_klasses
