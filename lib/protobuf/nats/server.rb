@@ -76,11 +76,11 @@ module Protobuf
 
       def run
         nats.on_reconnect do
-          logger.warn "Reconnected to NATS server!"
+          logger.warn "Server NATS connection was reconnected"
         end
 
         nats.on_disconnect do
-          logger.warn "Disconnected from NATS server!"
+          logger.warn "Server NATS connection was disconnected"
         end
 
         nats.on_error do |error|
@@ -88,7 +88,7 @@ module Protobuf
         end
 
         nats.on_close do
-          logger.warn "NATS connection was closed!"
+          logger.warn "Server NATS connection was closed"
         end
 
         subscribe_to_services
