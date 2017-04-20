@@ -50,9 +50,11 @@ An example config looks like this:
       - "nats://127.0.0.1:4222"
       - "nats://127.0.0.1:4223"
       - "nats://127.0.0.1:4224"
+    max_reconnect_attempts: 500
     uses_tls: true
     tls_client_cert: "/path/to/client-cert.pem"
     tls_client_key: "/path/to/client-key.pem"
+    tls_ca_cert: "/path/to/ca.pem"
     connect_timeout: 2
 ```
 

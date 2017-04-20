@@ -6,7 +6,7 @@ describe ::Protobuf::Nats::Config do
     expect(subject.connect_timeout).to eq(nil)
   end
 
-  it "does not load tls by default" do
+  it "has default options without tls" do
     subject.servers = ["nats://127.0.0.1:4222"]
     expected_options = {
       :servers => ["nats://127.0.0.1:4222"],
@@ -15,6 +15,7 @@ describe ::Protobuf::Nats::Config do
       :tls_client_cert => nil,
       :tls_client_key => nil,
       :uses_tls => false,
+      :max_reconnect_attempts => 60_000,
     }
     expect(subject.connection_options).to eq(expected_options)
   end
@@ -53,6 +54,7 @@ describe ::Protobuf::Nats::Config do
     expect(subject.servers).to eq(["nats://127.0.0.1:4222", "nats://127.0.0.1:4223", "nats://127.0.0.1:4224"])
     expect(subject.uses_tls).to eq(true)
     expect(subject.connect_timeout).to eq(2)
+    expect(subject.max_reconnect_attempts).to eq(1234)
 
     ENV["PROTOBUF_NATS_CONFIG_PATH"] = nil
   end
@@ -64,6 +66,7 @@ describe ::Protobuf::Nats::Config do
     expect(subject.servers).to eq(nil)
     expect(subject.uses_tls).to eq(false)
     expect(subject.connect_timeout).to eq(nil)
+    expect(subject.max_reconnect_attempts).to eq(60_000)
 
     ENV["PROTOBUF_NATS_CONFIG_PATH"] = nil
   end
