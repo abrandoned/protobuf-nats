@@ -75,7 +75,10 @@ module Protobuf
             parse_response
           rescue ::Protobuf::Nats::Errors::IOException => error
             ::Protobuf::Nats.log_error(error)
-            sleep reconnect_delay
+
+            delay = reconnect_delay
+            logger.warn "An IOException was raised. We are going to sleep for #{delay} seconds."
+            sleep delay
 
             retry if (retries -= 1) > 0
             raise
