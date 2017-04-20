@@ -128,8 +128,6 @@ module Protobuf
           response
         ensure
           # Ensure we don't leave a subscriptiosn sitting around.
-          # This also cleans up memory. It's a no-op if the subscription
-          # is already cleaned up.
           nats.unsubscribe(sub)
         end
 
