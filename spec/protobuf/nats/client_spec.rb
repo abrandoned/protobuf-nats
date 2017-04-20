@@ -14,6 +14,34 @@ describe ::Protobuf::Nats::Client do
 
   subject { described_class.new(options) }
 
+  describe "#ack_timeout" do
+    it "can be set via the PB_NATS_CLIENT_ACK_TIMEOUT environment variable" do
+      ::ENV["PB_NATS_CLIENT_ACK_TIMEOUT"] = "1000"
+
+      expect(subject.ack_timeout).to eq(1_000)
+
+      ::ENV.delete("PB_NATS_CLIENT_ACK_TIMEOUT")
+    end
+
+    it "has a default value" do
+      expect(subject.ack_timeout).to eq(5)
+    end
+  end
+
+  describe "#response_timeout" do
+    it "can be set via the PB_NATS_CLIENT_RESPONSE_TIMEOUT environment variable" do
+      ::ENV["PB_NATS_CLIENT_RESPONSE_TIMEOUT"] = "1000"
+
+      expect(subject.response_timeout).to eq(1_000)
+
+      ::ENV.delete("PB_NATS_CLIENT_RESPONSE_TIMEOUT")
+    end
+
+    it "has a default value" do
+      expect(subject.response_timeout).to eq(60)
+    end
+  end
+
   describe "#cached_subscription_key" do
     it "caches the instance of a subscription key" do
       ::Protobuf::Nats::Client.instance_variable_set(:@subscription_key_cache, nil)
