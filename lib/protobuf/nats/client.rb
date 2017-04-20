@@ -48,6 +48,14 @@ module Protobuf
         end
       end
 
+      def reconnect_delay
+        @reconnect_delay ||= if ::ENV.key?("PB_NATS_CLIENT_RECONNECT_DELAY")
+          ::ENV["PB_NATS_CLIENT_RECONNECT_DELAY"].to_i
+        else
+          ack_timeout
+        end
+      end
+
       def response_timeout
         @response_timeout ||= if ::ENV.key?("PB_NATS_CLIENT_RESPONSE_TIMEOUT")
           ::ENV["PB_NATS_CLIENT_RESPONSE_TIMEOUT"].to_i
@@ -67,7 +75,7 @@ module Protobuf
             parse_response
           rescue ::Protobuf::Nats::Errors::IOException => error
             ::Protobuf::Nats.log_error(error)
-            sleep ack_timeout
+            sleep reconnect_delay
 
             retry if (retries -= 1) > 0
             raise
