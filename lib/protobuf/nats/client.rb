@@ -65,6 +65,12 @@ module Protobuf
             request_options = {:timeout => response_timeout, :ack_timeout => ack_timeout}
             @response_data = nats_request_with_two_responses(cached_subscription_key, @request_data, request_options)
             parse_response
+          rescue ::Protobuf::Nats::Errors::IOException => error
+            ::Protobuf::Nats.log_error(error)
+            sleep ack_timeout
+
+            retry if (retries -= 1) > 0
+            raise
           rescue ::NATS::IO::Timeout
             # Nats response timeout.
             retry if (retries -= 1) > 0

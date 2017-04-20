@@ -113,5 +113,15 @@ describe ::Protobuf::Nats::Client do
       expect(subject).to receive(:complete).exactly(1).times
       expect { subject.send_request }.to raise_error(::NATS::IO::Timeout)
     end
+
+    it "waits an ack_timeout duration when the nats connection is reconnecting" do
+      error = ::Protobuf::Nats::Errors::IOException.new
+      client = ::FakeNatsClient.new
+      allow(::Protobuf::Nats).to receive(:client_nats_connection).and_return(client)
+      allow(client).to receive(:publish).and_raise(error)
+      allow(subject).to receive(:setup_connection)
+      expect(subject).to receive(:ack_timeout).and_return(0.01).exactly(6).times
+      expect { subject.send_request }.to raise_error(error)
+    end
   end
 end

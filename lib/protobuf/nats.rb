@@ -6,6 +6,7 @@ require "protobuf/rpc/service_directory"
 
 require "nats/io/client"
 
+require "protobuf/nats/errors"
 require "protobuf/nats/client"
 require "protobuf/nats/server"
 require "protobuf/nats/runner"

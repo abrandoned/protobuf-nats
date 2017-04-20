@@ -3,6 +3,9 @@ require "protobuf/nats"
 require "fake_nats_client"
 require "pry"
 
+# Turn off protobuf logging.
+::Protobuf::Logging.logger = ::Logger.new(nil)
+
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure
   config.example_status_persistence_file_path = ".rspec_status"
