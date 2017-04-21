@@ -48,6 +48,14 @@ module Protobuf
         end
       end
 
+      def reconnect_delay
+        @reconnect_delay ||= if ::ENV.key?("PB_NATS_CLIENT_RECONNECT_DELAY")
+          ::ENV["PB_NATS_CLIENT_RECONNECT_DELAY"].to_i
+        else
+          ack_timeout
+        end
+      end
+
       def response_timeout
         @response_timeout ||= if ::ENV.key?("PB_NATS_CLIENT_RESPONSE_TIMEOUT")
           ::ENV["PB_NATS_CLIENT_RESPONSE_TIMEOUT"].to_i
@@ -65,6 +73,15 @@ module Protobuf
             request_options = {:timeout => response_timeout, :ack_timeout => ack_timeout}
             @response_data = nats_request_with_two_responses(cached_subscription_key, @request_data, request_options)
             parse_response
+          rescue ::Protobuf::Nats::Errors::IOException => error
+            ::Protobuf::Nats.log_error(error)
+
+            delay = reconnect_delay
+            logger.warn "An IOException was raised. We are going to sleep for #{delay} seconds."
+            sleep delay
+
+            retry if (retries -= 1) > 0
+            raise
           rescue ::NATS::IO::Timeout
             # Nats response timeout.
             retry if (retries -= 1) > 0

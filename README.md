@@ -31,6 +31,8 @@ You can also use the following environment variables to tune parameters:
 
 `PB_NATS_CLIENT_RESPONSE_TIMEOUT` - Seconds to wait for a non-ACK response from the rpc server (default: 60 seconds)
 
+`PB_NATS_CLIENT_RECONNECT_DELAY` - If we detect a reconnect delay, we will wait this many seconds (default: the ACK timeout)
+
 `PROTOBUF_NATS_CONFIG_PATH` - Custom path to the config yaml (default: "config/protobuf_nats.yml")
 
 ### YAML Config
@@ -50,9 +52,11 @@ An example config looks like this:
       - "nats://127.0.0.1:4222"
       - "nats://127.0.0.1:4223"
       - "nats://127.0.0.1:4224"
+    max_reconnect_attempts: 500
     uses_tls: true
     tls_client_cert: "/path/to/client-cert.pem"
     tls_client_key: "/path/to/client-key.pem"
+    tls_ca_cert: "/path/to/ca.pem"
     connect_timeout: 2
 ```
 

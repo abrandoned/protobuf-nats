@@ -4,12 +4,13 @@ require "yaml"
 module Protobuf
   module Nats
     class Config
-      attr_accessor :uses_tls, :servers, :connect_timeout, :tls_client_cert, :tls_client_key, :tls_ca_cert
+      attr_accessor :uses_tls, :servers, :connect_timeout, :tls_client_cert, :tls_client_key, :tls_ca_cert, :max_reconnect_attempts
 
       CONFIG_MUTEX = ::Mutex.new
 
       DEFAULTS = {
         :connect_timeout => nil,
+        :max_reconnect_attempts => 60_000,
         :servers => nil,
         :tls_client_cert => nil,
         :tls_client_key => nil,
@@ -54,6 +55,7 @@ module Protobuf
         @connection_options ||= begin
           options = {
             servers: servers,
+            max_reconnect_attempts: max_reconnect_attempts,
             uses_tls: uses_tls,
             tls_client_cert: tls_client_cert,
             tls_client_key: tls_client_key,

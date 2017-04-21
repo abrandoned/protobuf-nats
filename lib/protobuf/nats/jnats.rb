@@ -39,8 +39,12 @@ module Protobuf
         servers = [servers].flatten.map { |uri_string| java.net.URI.new(uri_string) }
         connection_factory = ::Java::IoNatsClient::ConnectionFactory.new
         connection_factory.setServers(servers)
-        # Basically never stop trying to connect
-        connection_factory.setMaxReconnect(60_000)
+        connection_factory.setMaxReconnect(options[:max_reconnect_attempts])
+
+        # Shrink the pending buffer to always raise an error and let the caller retry.
+        if options[:disable_reconnect_buffer]
+          connection_factory.setReconnectBufSize(1)
+        end
 
         # Setup callbacks
         connection_factory.setDisconnectedCallback { |event| @on_disconnect_cb.call }

@@ -28,6 +28,20 @@ describe ::Protobuf::Nats::Client do
     end
   end
 
+  describe "#reconnect_delay" do
+    it "can be set via the PB_NATS_CLIENT_RECONNECT_DELAY environment variable" do
+      ::ENV["PB_NATS_CLIENT_RECONNECT_DELAY"] = "1000"
+
+      expect(subject.reconnect_delay).to eq(1_000)
+
+      ::ENV.delete("PB_NATS_CLIENT_RECONNECT_DELAY")
+    end
+
+    it "defaults to the ack_timeout" do
+      expect(subject.reconnect_delay).to eq(subject.ack_timeout)
+    end
+  end
+
   describe "#response_timeout" do
     it "can be set via the PB_NATS_CLIENT_RESPONSE_TIMEOUT environment variable" do
       ::ENV["PB_NATS_CLIENT_RESPONSE_TIMEOUT"] = "1000"
@@ -112,6 +126,16 @@ describe ::Protobuf::Nats::Client do
       expect(subject).to receive(:nats_request_with_two_responses).and_raise(::NATS::IO::Timeout).exactly(3).times
       expect(subject).to receive(:complete).exactly(1).times
       expect { subject.send_request }.to raise_error(::NATS::IO::Timeout)
+    end
+
+    it "waits the reconnect_delay duration when the nats connection is reconnecting" do
+      error = ::Protobuf::Nats::Errors::IOException.new
+      client = ::FakeNatsClient.new
+      allow(::Protobuf::Nats).to receive(:client_nats_connection).and_return(client)
+      allow(client).to receive(:publish).and_raise(error)
+      allow(subject).to receive(:setup_connection)
+      expect(subject).to receive(:reconnect_delay).and_return(0.01).exactly(3).times
+      expect { subject.send_request }.to raise_error(error)
     end
   end
 end

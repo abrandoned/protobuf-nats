@@ -5,6 +5,7 @@
       - "nats://127.0.0.1:4222"
       - "nats://127.0.0.1:4223"
       - "nats://127.0.0.1:4224"
+    max_reconnect_attempts: 1234
     uses_tls: true
     tls_client_cert: "./spec/support/certs/client-cert.pem"
     tls_client_key: "./spec/support/certs/client-key.pem"
