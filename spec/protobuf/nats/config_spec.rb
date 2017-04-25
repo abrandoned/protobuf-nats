@@ -16,6 +16,7 @@ describe ::Protobuf::Nats::Config do
       :tls_client_key => nil,
       :uses_tls => false,
       :max_reconnect_attempts => 60_000,
+      :service_replacements => [],
     }
     expect(subject.connection_options).to eq(expected_options)
   end
@@ -55,6 +56,7 @@ describe ::Protobuf::Nats::Config do
     expect(subject.uses_tls).to eq(true)
     expect(subject.connect_timeout).to eq(2)
     expect(subject.max_reconnect_attempts).to eq(1234)
+    expect(subject.service_replacements).to eq([{"original_" => "local_"}, {"another_subscription" => "different_subscription"}])
 
     ENV["PROTOBUF_NATS_CONFIG_PATH"] = nil
   end
@@ -81,5 +83,15 @@ describe ::Protobuf::Nats::Config do
     expect(connection_options[:tls_ca_cert]).to eq("./spec/support/certs/ca.pem")
 
     ENV["PROTOBUF_NATS_CONFIG_PATH"] = nil
+  end
+
+  it "replaces subscription_key using service_replacements" do
+    ENV["PROTOBUF_NATS_CONFIG_PATH"] = "spec/support/protobuf_nats.yml"
+
+    subject.load_from_yml
+
+    expect(subject.make_subscription_key_replacements("rpc.original_subscription")).to eq "rpc.local_subscription"
+    expect(subject.make_subscription_key_replacements("rpc.another_subscription")).to eq "rpc.different_subscription"
+    expect(subject.make_subscription_key_replacements("rpc.subscription")).to eq "rpc.subscription"
   end
 end
