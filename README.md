@@ -38,10 +38,12 @@ You can also use the following environment variables to tune parameters:
 ### YAML Config
 
 The client and server are configured via environment variables defined in the `pure-ruby-nats` gem. However, there are a
-few params which cannot be set: `servers`, `uses_tls` and `connect_timeout`, so those my be defined in a yml file.
+few params which cannot be set: `servers`, `uses_tls`, `service_replacements`, and `connect_timeout`, so those my be defined in a yml file.
 
 The library will automatically look for a file with a relative path of `config/protobuf_nats.yml`, but you may override
 this by specifying a different file via the `PROTOBUF_NATS_CONFIG_PATH` env variable.
+
+The `service_replacements` feature is something we have found useful for local testing, but it is subject to breaking changes.
 
 An example config looks like this:
 ```
@@ -58,6 +60,8 @@ An example config looks like this:
     tls_client_key: "/path/to/client-key.pem"
     tls_ca_cert: "/path/to/ca.pem"
     connect_timeout: 2
+    service_replacements:
+      - "original_service": "replacement_service
 ```
 
 ## Usage
