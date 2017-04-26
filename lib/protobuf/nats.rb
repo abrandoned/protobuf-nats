@@ -45,7 +45,9 @@ module Protobuf
     def self.subscription_key(service_klass, service_method)
       service_class_name = service_klass.name.underscore.gsub("/", ".")
       service_method_name = service_method.to_s.underscore
-      "rpc.#{service_class_name}.#{service_method_name}"
+
+      subscription_key = "rpc.#{service_class_name}.#{service_method_name}"
+      subscription_key = config.make_subscription_key_replacements(subscription_key)
     end
 
     def self.start_client_nats_connection

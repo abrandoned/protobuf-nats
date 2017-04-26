@@ -11,6 +11,9 @@
     tls_client_key: "./spec/support/certs/client-key.pem"
     tls_ca_cert: "./spec/support/certs/ca.pem"
     connect_timeout: 2
+    subscription_key_replacements:
+      - "original_": "local_"
+      - "another_subscription": "different_subscription"
 
   development:
     <<: *defaults
