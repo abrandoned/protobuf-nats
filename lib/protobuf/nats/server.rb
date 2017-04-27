@@ -44,7 +44,7 @@ module Protobuf
             # Publish response.
             nats.publish(reply_id, response_data)
           rescue => error
-            ::Protobuf::Nats.log_error(error)
+            ::Protobuf::Nats.notify_error_callbacks(error)
           end
         end
 
@@ -84,7 +84,7 @@ module Protobuf
         end
 
         nats.on_error do |error|
-          ::Protobuf::Nats.log_error(error)
+          ::Protobuf::Nats.notify_error_callbacks(error)
         end
 
         nats.on_close do

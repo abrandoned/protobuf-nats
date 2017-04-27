@@ -42,6 +42,32 @@ module Protobuf
     # Eagerly load the yml config.
     config
 
+    # We will always log  an error.
+    def self.error_callbacks
+      @error_callbacks ||= [lambda { |error| log_error(error) }]
+    end
+
+    # Eagerly load the yml config.
+    error_callbacks
+
+    def self.on_error(&block)
+      fail ::ArgumentError unless block.arity == 1
+      error_callbacks << block
+      nil
+    end
+
+    def self.notify_error_callbacks(error)
+      error_callbacks.each do |callback|
+        begin
+          callback.call(error)
+        rescue => callback_error
+          log_error(callback_error)
+        end
+      end
+
+      nil
+    end
+
     def self.subscription_key(service_klass, service_method)
       service_class_name = service_klass.name.underscore.gsub("/", ".")
       service_method_name = service_method.to_s.underscore
@@ -83,7 +109,7 @@ module Protobuf
           end
 
           @client_nats_connection.on_error do |error|
-            log_error(error)
+            notify_error_callbacks(error)
           end
 
           true
