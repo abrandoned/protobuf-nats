@@ -20,7 +20,6 @@ module Protobuf
 
     module Messages
       ACK = "\1".freeze
-      ACK_WITH_SERVER_PREFIX = "\2".freeze
     end
 
     NatsClient = if defined? JRUBY_VERSION

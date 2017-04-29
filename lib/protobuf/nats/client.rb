@@ -132,9 +132,6 @@ module Protobuf
           has_ack = false
           case first_message.data
           when ::Protobuf::Nats::Messages::ACK then has_ack = true
-          when /^#{::Protobuf::Nats::Messages::ACK_WITH_SERVER_PREFIX}/
-            has_ack = true
-            @stats.server = first_message.data[1..-1]
           else response = first_message.data
           end
           case second_message.data
