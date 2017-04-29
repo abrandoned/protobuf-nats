@@ -19,8 +19,15 @@ module Protobuf
     end
 
     module Messages
-      ACK = "\1".freeze
-      ACK_WITH_SERVER_PREFIX = "\2".freeze
+      ACK = "\1".force_encoding(Encoding::BINARY).freeze
+
+      # \x80\x00 is used because it should never appear in a valid protobuf
+      # object, i.e.,
+      #
+      #     encode(decode("\x80\x00")) => "\x00"
+      #
+      # \x80\x00 through \xFF\x00 can all be used for this purpose.
+      ACK_WITH_SERVER = "\x80\x00".force_encoding(Encoding::BINARY).freeze
     end
 
     NatsClient = if defined? JRUBY_VERSION

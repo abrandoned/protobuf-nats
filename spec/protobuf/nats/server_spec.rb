@@ -87,4 +87,23 @@ describe ::Protobuf::Nats::Server do
       sleep 0.1 until subject.thread_pool.size.zero?
     end
   end
+
+  describe "#server_name" do
+    it "is configurable via options" do
+      server = described_class.new(options.merge(:server_name => "blargh"))
+      expect(server.server_name).to eq("blargh")
+    end
+
+    it "is used in ack_msg when configured" do
+      server = described_class.new(options.merge(:server_name => "blargh"))
+      expect(server.ack_msg).to eq("\x80\x00blargh".force_encoding("BINARY"))
+    end
+
+    it "is the first available ipv4 address by default" do
+      expect(Socket).to receive(:ip_address_list).and_return([Addrinfo.ip("127.3.3.3")])
+      server = described_class.new(options)
+      expect(server.server_name).to eq("127.3.3.3")
+      expect(server.ack_msg).to eq("\x80\x00127.3.3.3".force_encoding("BINARY"))
+    end
+  end
 end

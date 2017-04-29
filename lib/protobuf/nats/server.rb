@@ -25,7 +25,7 @@ module Protobuf
 
         @server_name = options.fetch(:server_name, first_ipv4_address)
         @ack_msg = if @server_name
-                     "#{::Protobuf::Nats::Messages::ACK_WITH_SERVER_PREFIX}#{@server_name}"
+                     ::Protobuf::Nats::Messages::ACK_WITH_SERVER.dup << @server_name
                    else
                      ::Protobuf::Nats::Messages::ACK
                    end
