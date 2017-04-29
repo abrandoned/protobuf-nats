@@ -57,7 +57,7 @@ describe ::Protobuf::Nats::Server do
     it "sends an ACK if the thread pool enqueued the task" do
       # Fill the thread pool.
       2.times { subject.thread_pool.push { sleep 1 } }
-      expect(subject.nats).to receive(:publish).with("inbox_123", ::Protobuf::Nats::Messages::ACK)
+      expect(subject.nats).to receive(:publish).with("inbox_123", "#{::Protobuf::Nats::Messages::ACK_WITH_SERVER_PREFIX}127.0.0.1")
       # Wait for promise to finish executing.
       expect(subject.enqueue_request("", "inbox_123")).to eq(true)
       subject.thread_pool.kill
@@ -79,7 +79,7 @@ describe ::Protobuf::Nats::Server do
       response = "some response data"
       inbox = "inbox_123"
       expect(subject).to receive(:handle_request).and_return(response)
-      expect(client).to receive(:publish).once.ordered.with(inbox, ::Protobuf::Nats::Messages::ACK)
+      expect(client).to receive(:publish).once.ordered.with(inbox, "#{::Protobuf::Nats::Messages::ACK_WITH_SERVER_PREFIX}127.0.0.1")
       expect(client).to receive(:publish).once.ordered.with(inbox, response)
 
       # Wait for promise to finish executing.
