@@ -9,7 +9,7 @@ module Protobuf
       include ::Protobuf::Rpc::Server
       include ::Protobuf::Logging
 
-      attr_reader :nats, :thread_pool, :subscriptions, :server_ip, :ack_msg
+      attr_reader :nats, :thread_pool, :subscriptions, :server_name, :ack_msg
 
       def initialize(options)
         @options = options
@@ -23,9 +23,9 @@ module Protobuf
 
         @subscriptions = []
 
-        @server_ip = options.fetch(:server_ip, first_ipv4_address)
-        @ack_msg = if @server_ip
-                     "#{::Protobuf::Nats::Messages::ACK_WITH_SERVER_PREFIX}#{@server_ip}"
+        @server_name = options.fetch(:server_name, first_ipv4_address)
+        @ack_msg = if @server_name
+                     "#{::Protobuf::Nats::Messages::ACK_WITH_SERVER_PREFIX}#{@server_name}"
                    else
                      ::Protobuf::Nats::Messages::ACK
                    end
