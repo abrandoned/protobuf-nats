@@ -141,7 +141,6 @@ module Protobuf
           when ::Protobuf::Nats::Messages::ACK then has_ack = true
           when ::Protobuf::Nats::Messages::ACK_WITH_SERVER
             has_ack = true
-            @stats.server = second_message.data.byteslice(2..-1)
             @stats.server = [0, second_message.data.byteslice(2..-1)]
           else response = second_message.data
           end
