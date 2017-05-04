@@ -21,25 +21,6 @@ module Protobuf
         @subscription_key_cache ||= {}
       end
 
-      # This is an alternative to depending on #failure for invoking the error callback.
-      # We never want to silence an error in the event that no callback is provided.
-      def failure_handler
-        yield
-      rescue => error
-        logger.debug { sign_message("Server failed request (invoking on_failure): #{error.inspect}") }
-
-        begin
-          if @failure_cb
-            @failure_cb.call(error)
-          else
-            raise
-          end
-        ensure
-          # Complete stats and log
-          complete
-        end
-      end
-
       def ack_timeout
         @ack_timeout ||= if ::ENV.key?("PB_NATS_CLIENT_ACK_TIMEOUT")
           ::ENV["PB_NATS_CLIENT_ACK_TIMEOUT"].to_i
@@ -65,29 +46,28 @@ module Protobuf
       end
 
       def send_request
-        failure_handler do
-          begin
-            retries ||= 3
+        retries ||= 3
 
-            setup_connection
-            request_options = {:timeout => response_timeout, :ack_timeout => ack_timeout}
-            @response_data = nats_request_with_two_responses(cached_subscription_key, @request_data, request_options)
-            parse_response
-          rescue ::Protobuf::Nats::Errors::IOException => error
-            ::Protobuf::Nats.log_error(error)
+        setup_connection
+        request_options = {:timeout => response_timeout, :ack_timeout => ack_timeout}
+        @response_data = nats_request_with_two_responses(cached_subscription_key, @request_data, request_options)
+        parse_response
+      rescue ::Protobuf::Nats::Errors::IOException => error
+        ::Protobuf::Nats.log_error(error)
 
-            delay = reconnect_delay
-            logger.warn "An IOException was raised. We are going to sleep for #{delay} seconds."
-            sleep delay
+        delay = reconnect_delay
+        logger.warn "An IOException was raised. We are going to sleep for #{delay} seconds."
+        sleep delay
 
-            retry if (retries -= 1) > 0
-            raise
-          rescue ::NATS::IO::Timeout
-            # Nats response timeout.
-            retry if (retries -= 1) > 0
-            raise
-          end
-        end
+        retry if (retries -= 1) > 0
+        raise
+      rescue ::NATS::IO::Timeout
+        # Nats response timeout.
+        retry if (retries -= 1) > 0
+        raise
+      ensure
+        # Complete stats and log
+        complete
       end
 
       def cached_subscription_key
