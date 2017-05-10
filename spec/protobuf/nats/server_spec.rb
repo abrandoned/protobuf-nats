@@ -57,7 +57,7 @@ describe ::Protobuf::Nats::Server do
     it "sends an ACK if the thread pool enqueued the task" do
       # Fill the thread pool.
       2.times { subject.thread_pool.push { sleep 1 } }
-      expect(subject.nats).to receive(:publish).with("inbox_123", ::Protobuf::Nats::Messages::ACK)
+      expect(subject.nats).to receive(:publish).with("inbox_123", "#{subject.ack_msg}")
       # Wait for promise to finish executing.
       expect(subject.enqueue_request("", "inbox_123")).to eq(true)
       subject.thread_pool.kill
@@ -79,12 +79,31 @@ describe ::Protobuf::Nats::Server do
       response = "some response data"
       inbox = "inbox_123"
       expect(subject).to receive(:handle_request).and_return(response)
-      expect(client).to receive(:publish).once.ordered.with(inbox, ::Protobuf::Nats::Messages::ACK)
+      expect(client).to receive(:publish).once.ordered.with(inbox, "#{subject.ack_msg}")
       expect(client).to receive(:publish).once.ordered.with(inbox, response)
 
       # Wait for promise to finish executing.
       expect(subject.enqueue_request("", inbox)).to eq(true)
       sleep 0.1 until subject.thread_pool.size.zero?
+    end
+  end
+
+  describe "#server_name" do
+    it "is configurable via options" do
+      server = described_class.new(options.merge(:server_name => "blargh"))
+      expect(server.server_name).to eq("blargh")
+    end
+
+    it "is used in ack_msg when configured" do
+      server = described_class.new(options.merge(:server_name => "blargh"))
+      expect(server.ack_msg).to eq("\x80\x00blargh".force_encoding("BINARY"))
+    end
+
+    it "is the first available ipv4 address by default" do
+      expect(Socket).to receive(:ip_address_list).and_return([Addrinfo.ip("127.3.3.3")])
+      server = described_class.new(options)
+      expect(server.server_name).to eq("127.3.3.3")
+      expect(server.ack_msg).to eq("\x80\x00127.3.3.3".force_encoding("BINARY"))
     end
   end
 end

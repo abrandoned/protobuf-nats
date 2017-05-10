@@ -104,6 +104,26 @@ describe ::Protobuf::Nats::Client do
       options = {:timeout => 0.1}
       expect { subject.nats_request_with_two_responses(msg_subject, "request data", options) }.to raise_error(::NATS::IO::Timeout)
     end
+
+    it "sets the server name when it is passed in the ack" do
+      ack_with_server = "\x80\x00derpderp".force_encoding("BINARY")
+      client.schedule_messages([::FakeNatsClient::Message.new(inbox, ack_with_server, 0.05),
+                                ::FakeNatsClient::Message.new(inbox, response, 0.1)])
+
+      server_response = subject.nats_request_with_two_responses(msg_subject, "request data", {})
+      expect(server_response).to eq(response)
+      expect(subject.instance_variable_get(:@stats).server).to eq("derpderp:0")
+    end
+
+    it "sets the server name when it is sent out of order" do
+      ack_with_server = "\x80\x00derpderp".force_encoding("BINARY")
+      client.schedule_messages([::FakeNatsClient::Message.new(inbox, ack_with_server, 0.1),
+                                ::FakeNatsClient::Message.new(inbox, response, 0.05)])
+
+      server_response = subject.nats_request_with_two_responses(msg_subject, "request data", {})
+      expect(server_response).to eq(response)
+      expect(subject.instance_variable_get(:@stats).server).to eq("derpderp:0")
+    end
   end
 
   describe "#send_request" do

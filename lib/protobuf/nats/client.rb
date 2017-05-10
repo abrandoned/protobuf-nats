@@ -110,12 +110,18 @@ module Protobuf
           # Check messages
           response = nil
           has_ack = false
-          case first_message.data
+          case first_message.data.byteslice(0, 2)
           when ::Protobuf::Nats::Messages::ACK then has_ack = true
+          when ::Protobuf::Nats::Messages::ACK_WITH_SERVER
+            has_ack = true
+            @stats.server = [0, first_message.data.byteslice(2..-1)]
           else response = first_message.data
           end
-          case second_message.data
+          case second_message.data.byteslice(0, 2)
           when ::Protobuf::Nats::Messages::ACK then has_ack = true
+          when ::Protobuf::Nats::Messages::ACK_WITH_SERVER
+            has_ack = true
+            @stats.server = [0, second_message.data.byteslice(2..-1)]
           else response = second_message.data
           end
 
@@ -139,8 +145,12 @@ module Protobuf
           response = nil
           sid = nats.subscribe(inbox, :max => 2) do |message, _, _|
             lock.synchronize do
-              case message
+              case message.byteslice(0, 2)
               when ::Protobuf::Nats::Messages::ACK
+                ack_condition.signal
+                next
+              when ::Protobuf::Nats::Messages::ACK_WITH_SERVER
+                @stats.server = [0, message.byteslice(2..-1)]
                 ack_condition.signal
                 next
               else

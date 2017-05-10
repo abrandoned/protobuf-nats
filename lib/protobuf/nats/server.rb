@@ -9,7 +9,7 @@ module Protobuf
       include ::Protobuf::Rpc::Server
       include ::Protobuf::Logging
 
-      attr_reader :nats, :thread_pool, :subscriptions
+      attr_reader :nats, :thread_pool, :subscriptions, :server_name, :ack_msg
 
       def initialize(options)
         @options = options
@@ -22,6 +22,13 @@ module Protobuf
         @thread_pool = ::Protobuf::Nats::ThreadPool.new(@options[:threads], :max_queue => max_queue_size)
 
         @subscriptions = []
+
+        @server_name = options.fetch(:server_name, first_ipv4_address)
+        @ack_msg = if @server_name
+                     ::Protobuf::Nats::Messages::ACK_WITH_SERVER.dup << @server_name
+                   else
+                     ::Protobuf::Nats::Messages::ACK
+                   end
       end
 
       def max_queue_size
@@ -49,7 +56,7 @@ module Protobuf
         end
 
         # Publish an ACK to signal the server has picked up the work.
-        nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK) if was_enqueued
+        nats.publish(reply_id, ack_msg) if was_enqueued
 
         was_enqueued
       end
@@ -118,6 +125,12 @@ module Protobuf
 
       def stop
         @running = false
+      end
+
+      def first_ipv4_address
+        Socket.ip_address_list.find { |addrinfo| addrinfo.ipv4? }.ip_address
+      rescue
+        nil
       end
     end
   end
