@@ -22,6 +22,7 @@ module Protobuf
         @thread_pool = ::Protobuf::Nats::ThreadPool.new(@options[:threads], :max_queue => max_queue_size)
 
         @subscriptions = []
+        @server = options.fetch(:server, first_ipv4_address)
       end
 
       def max_queue_size
@@ -32,6 +33,10 @@ module Protobuf
         end
       end
 
+      def first_ipv4_address
+        Socket.ip_address_list.find { |addrinfo| addrinfo.ipv4? }.ip_address
+      end
+
       def service_klasses
         ::Protobuf::Rpc::Service.implemented_services.map(&:safe_constantize)
       end
@@ -40,7 +45,7 @@ module Protobuf
         was_enqueued = thread_pool.push do
           begin
             # Process request.
-            response_data = handle_request(request_data)
+            response_data = handle_request(request_data, 'server' => @server)
             # Publish response.
             nats.publish(reply_id, response_data)
           rescue => error

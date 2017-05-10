@@ -13,7 +13,8 @@ describe ::Protobuf::Nats::Server do
   let(:options) {
     {
       :threads => 2,
-      :client => client
+      :client  => client,
+      :server  => 'derpaderp'
     }
   }
 
@@ -65,7 +66,7 @@ describe ::Protobuf::Nats::Server do
 
     it "logs any error that is raised within the request block" do
       request_data = "yolo"
-      expect(subject).to receive(:handle_request).with(request_data).and_raise(::RuntimeError, "mah error")
+      expect(subject).to receive(:handle_request).with(request_data, 'server' => 'derpaderp').and_raise(::RuntimeError, "mah error")
       expect(logger).to receive(:error).once.ordered.with("mah error")
       expect(logger).to receive(:error).once.ordered.with("RuntimeError")
       expect(logger).to receive(:error).once.ordered
