@@ -22,7 +22,7 @@ module Protobuf
         @thread_pool = ::Protobuf::Nats::ThreadPool.new(@options[:threads], :max_queue => max_queue_size)
 
         @subscriptions = []
-        @server = options.fetch(:server, first_ipv4_address)
+        @server = options.fetch(:server, ::Socket.gethostname)
       end
 
       def max_queue_size
@@ -31,10 +31,6 @@ module Protobuf
         else
           @options[:threads]
         end
-      end
-
-      def first_ipv4_address
-        Socket.ip_address_list.find { |addrinfo| addrinfo.ipv4? }.ip_address
       end
 
       def service_klasses
