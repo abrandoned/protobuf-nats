@@ -39,6 +39,34 @@ describe ::Protobuf::Nats::Server do
     end
   end
 
+  describe "#slow_start_delay" do
+    it "has a default" do
+      expect(subject.slow_start_delay).to eq(10)
+    end
+
+    it "can be set via PB_NATS_SERVER_SLOW_START_DELAY environment variable" do
+      ::ENV["PB_NATS_SERVER_SLOW_START_DELAY"] = "20"
+
+      expect(subject.slow_start_delay).to eq(20)
+
+      ::ENV.delete("PB_NATS_SERVER_SLOW_START_DELAY")
+    end
+  end
+
+  describe "#subscriptions_per_rpc_route" do
+    it "has a default" do
+      expect(subject.subscriptions_per_rpc_route).to eq(10)
+    end
+
+    it "can be set via PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ROUTE environment variable" do
+      ::ENV["PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ROUTE"] = "20"
+
+      expect(subject.subscriptions_per_rpc_route).to eq(20)
+
+      ::ENV.delete("PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ROUTE")
+    end
+  end
+
   describe "#subscribe_to_services" do
     it "subscribes to services that inherit from protobuf rpc service" do
       subject.subscribe_to_services
