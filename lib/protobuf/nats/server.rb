@@ -26,11 +26,7 @@ module Protobuf
       end
 
       def max_queue_size
-        if ::ENV.key?("PB_NATS_SERVER_MAX_QUEUE_SIZE")
-          ::ENV["PB_NATS_SERVER_MAX_QUEUE_SIZE"].to_i
-        else
-          @options[:threads]
-        end
+        ::ENV.fetch("PB_NATS_SERVER_MAX_QUEUE_SIZE", @options[:threads]).to_i
       end
 
       def service_klasses
