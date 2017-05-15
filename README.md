@@ -25,15 +25,21 @@ Or install it yourself as:
 
 You can also use the following environment variables to tune parameters:
 
-`PB_NATS_SERVER_MAX_QUEUE_SIZE` - The size of the queue in front of your thread pool (default: thread count passed to CLI)
+`PB_NATS_SERVER_MAX_QUEUE_SIZE` - The size of the queue in front of your thread pool (default: thread count passed to CLI).
 
-`PB_NATS_CLIENT_ACK_TIMEOUT` - Seconds to wait for an ACK from the rpc server (default: 5 seconds)
+`PB_NATS_SERVER_SLOW_START_DELAY` - Seconds to wait before adding another round of subscriptions (default 10).
 
-`PB_NATS_CLIENT_RESPONSE_TIMEOUT` - Seconds to wait for a non-ACK response from the rpc server (default: 60 seconds)
+`PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ROUTE` - Number of subscriptions to create for each rpc endpoint. This number is
+used to allow JVM based servers to warm-up slowly to prevent jolts in runtime performance across your RPC network
+(default: 10).
 
-`PB_NATS_CLIENT_RECONNECT_DELAY` - If we detect a reconnect delay, we will wait this many seconds (default: the ACK timeout)
+`PB_NATS_CLIENT_ACK_TIMEOUT` - Seconds to wait for an ACK from the rpc server (default: 5 seconds).
 
-`PROTOBUF_NATS_CONFIG_PATH` - Custom path to the config yaml (default: "config/protobuf_nats.yml")
+`PB_NATS_CLIENT_RESPONSE_TIMEOUT` - Seconds to wait for a non-ACK response from the rpc server (default: 60 seconds).
+
+`PB_NATS_CLIENT_RECONNECT_DELAY` - If we detect a reconnect delay, we will wait this many seconds (default: the ACK timeout).
+
+`PROTOBUF_NATS_CONFIG_PATH` - Custom path to the config yaml (default: "config/protobuf_nats.yml").
 
 ### YAML Config
 
