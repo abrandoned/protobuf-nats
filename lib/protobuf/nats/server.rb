@@ -22,6 +22,7 @@ module Protobuf
         @thread_pool = ::Protobuf::Nats::ThreadPool.new(@options[:threads], :max_queue => max_queue_size)
 
         @subscriptions = []
+        @server = options.fetch(:server, ::Socket.gethostname)
       end
 
       def max_queue_size
@@ -40,7 +41,7 @@ module Protobuf
         was_enqueued = thread_pool.push do
           begin
             # Process request.
-            response_data = handle_request(request_data)
+            response_data = handle_request(request_data, 'server' => @server)
             # Publish response.
             nats.publish(reply_id, response_data)
           rescue => error
