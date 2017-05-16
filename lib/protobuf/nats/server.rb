@@ -33,8 +33,8 @@ module Protobuf
         ::ENV.fetch("PB_NATS_SERVER_SLOW_START_DELAY", 10).to_i
       end
 
-      def subscriptions_per_rpc_route
-        ::ENV.fetch("PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ROUTE", 10).to_i
+      def subscriptions_per_rpc_endpoint
+        ::ENV.fetch("PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ENDPOINT", 10).to_i
       end
 
       def service_klasses
@@ -91,19 +91,19 @@ module Protobuf
       end
 
       # Slow start subscriptions by adding X rounds of subz every
-      # Y seconds, where X is subscriptions_per_rpc_route and Y is
+      # Y seconds, where X is subscriptions_per_rpc_endpoint and Y is
       # slow_start_delay.
       def finish_slow_start
         logger.info "Slow start has started..."
         completed = 1
 
         # We have (X - 1) here because we always subscribe at least once.
-        (subscriptions_per_rpc_route - 1).times do
+        (subscriptions_per_rpc_endpoint - 1).times do
           next unless @running
           completed += 1
           sleep slow_start_delay
           subscribe_to_services
-          logger.info "Slow start adding another round of subscriptions (#{completed}/#{subscriptions_per_rpc_route})..."
+          logger.info "Slow start adding another round of subscriptions (#{completed}/#{subscriptions_per_rpc_endpoint})..."
         end
 
         logger.info "Slow start finished."

@@ -29,7 +29,7 @@ You can also use the following environment variables to tune parameters:
 
 `PB_NATS_SERVER_SLOW_START_DELAY` - Seconds to wait before adding another round of subscriptions (default 10).
 
-`PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ROUTE` - Number of subscriptions to create for each rpc endpoint. This number is
+`PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ENDPOINT` - Number of subscriptions to create for each rpc endpoint. This number is
 used to allow JVM based servers to warm-up slowly to prevent jolts in runtime performance across your RPC network
 (default: 10).
 

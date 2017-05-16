@@ -53,17 +53,17 @@ describe ::Protobuf::Nats::Server do
     end
   end
 
-  describe "#subscriptions_per_rpc_route" do
+  describe "#subscriptions_per_rpc_endpoint" do
     it "has a default" do
-      expect(subject.subscriptions_per_rpc_route).to eq(10)
+      expect(subject.subscriptions_per_rpc_endpoint).to eq(10)
     end
 
-    it "can be set via PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ROUTE environment variable" do
-      ::ENV["PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ROUTE"] = "20"
+    it "can be set via PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ENDPOINT environment variable" do
+      ::ENV["PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ENDPOINT"] = "20"
 
-      expect(subject.subscriptions_per_rpc_route).to eq(20)
+      expect(subject.subscriptions_per_rpc_endpoint).to eq(20)
 
-      ::ENV.delete("PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ROUTE")
+      ::ENV.delete("PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ENDPOINT")
     end
   end
 
