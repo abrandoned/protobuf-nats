@@ -30,11 +30,11 @@ module Protobuf
       end
 
       def slow_start_delay
-        ::ENV.fetch("PB_NATS_SERVER_SLOW_START_DELAY", 10).to_i
+        @slow_start_delay ||= ::ENV.fetch("PB_NATS_SERVER_SLOW_START_DELAY", 10).to_i
       end
 
       def subscriptions_per_rpc_endpoint
-        ::ENV.fetch("PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ENDPOINT", 10).to_i
+        @subscriptions_per_rpc_endpoint ||= ::ENV.fetch("PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ENDPOINT", 10).to_i
       end
 
       def service_klasses
