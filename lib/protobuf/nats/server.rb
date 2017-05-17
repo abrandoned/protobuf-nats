@@ -26,11 +26,15 @@ module Protobuf
       end
 
       def max_queue_size
-        if ::ENV.key?("PB_NATS_SERVER_MAX_QUEUE_SIZE")
-          ::ENV["PB_NATS_SERVER_MAX_QUEUE_SIZE"].to_i
-        else
-          @options[:threads]
-        end
+        ::ENV.fetch("PB_NATS_SERVER_MAX_QUEUE_SIZE", @options[:threads]).to_i
+      end
+
+      def slow_start_delay
+        @slow_start_delay ||= ::ENV.fetch("PB_NATS_SERVER_SLOW_START_DELAY", 10).to_i
+      end
+
+      def subscriptions_per_rpc_endpoint
+        @subscriptions_per_rpc_endpoint ||= ::ENV.fetch("PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ENDPOINT", 10).to_i
       end
 
       def service_klasses
@@ -55,24 +59,54 @@ module Protobuf
         was_enqueued
       end
 
-      def subscribe_to_services
+      def print_subscription_keys
         logger.info "Creating subscriptions:"
+
+        with_each_subscription_key do |subscription_key|
+          logger.info "  - #{subscription_key}"
+        end
+      end
+
+      def subscribe_to_services
+        with_each_subscription_key do |subscription_key_and_queue|
+          subscriptions << nats.subscribe(subscription_key_and_queue, :queue => subscription_key_and_queue) do |request_data, reply_id, _subject|
+            unless enqueue_request(request_data, reply_id)
+              logger.error { "Thread pool is full! Dropping message for: #{subscription_key_and_queue}" }
+            end
+          end
+        end
+      end
+
+      def with_each_subscription_key
+        fail ::ArgumentError unless block_given?
 
         service_klasses.each do |service_klass|
           service_klass.rpcs.each do |service_method, _|
             # Skip services that are not implemented.
             next unless service_klass.method_defined? service_method
 
-            subscription_key_and_queue = ::Protobuf::Nats.subscription_key(service_klass, service_method)
-            logger.info "  - #{subscription_key_and_queue}"
-
-            subscriptions << nats.subscribe(subscription_key_and_queue, :queue => subscription_key_and_queue) do |request_data, reply_id, _subject|
-              unless enqueue_request(request_data, reply_id)
-                logger.error { "Thread pool is full! Dropping message for: #{subscription_key_and_queue}" }
-              end
-            end
+            yield ::Protobuf::Nats.subscription_key(service_klass, service_method)
           end
         end
+      end
+
+      # Slow start subscriptions by adding X rounds of subz every
+      # Y seconds, where X is subscriptions_per_rpc_endpoint and Y is
+      # slow_start_delay.
+      def finish_slow_start
+        logger.info "Slow start has started..."
+        completed = 1
+
+        # We have (X - 1) here because we always subscribe at least once.
+        (subscriptions_per_rpc_endpoint - 1).times do
+          next unless @running
+          completed += 1
+          sleep slow_start_delay
+          subscribe_to_services
+          logger.info "Slow start adding another round of subscriptions (#{completed}/#{subscriptions_per_rpc_endpoint})..."
+        end
+
+        logger.info "Slow start finished."
       end
 
       def run
@@ -92,9 +126,10 @@ module Protobuf
           logger.warn "Server NATS connection was closed"
         end
 
+        print_subscription_keys
         subscribe_to_services
-
         yield if block_given?
+        finish_slow_start
 
         loop do
           break unless @running
