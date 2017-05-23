@@ -65,9 +65,6 @@ module Protobuf
         # Nats response timeout.
         retry if (retries -= 1) > 0
         raise
-      ensure
-        # Complete stats and log
-        complete
       end
 
       def cached_subscription_key
