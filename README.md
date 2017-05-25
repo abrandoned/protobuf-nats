@@ -27,6 +27,9 @@ You can also use the following environment variables to tune parameters:
 
 `PB_NATS_SERVER_MAX_QUEUE_SIZE` - The size of the queue in front of your thread pool (default: thread count passed to CLI).
 
+`PB_NATS_SERVER_PAUSE_FILE_PATH` - If this file exists, the server will pause by unsubscribing all services. When the
+file is resumed it will resubscribe and restart slow start (default: `nil`).
+
 `PB_NATS_SERVER_SLOW_START_DELAY` - Seconds to wait before adding another round of subscriptions (default 10).
 
 `PB_NATS_SERVER_SUBSCRIPTIONS_PER_RPC_ENDPOINT` - Number of subscriptions to create for each rpc endpoint. This number is

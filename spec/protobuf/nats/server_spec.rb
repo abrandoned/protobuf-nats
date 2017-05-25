@@ -25,6 +25,35 @@ describe ::Protobuf::Nats::Server do
     allow(subject).to receive(:service_klasses).and_return([SomeRandomService])
   end
 
+  describe "#detect_and_handle_a_pause" do
+    it "unsubscribes when the server is paused" do
+      allow(subject).to receive(:paused?).and_return(true)
+      expect(subject).to receive(:unsubscribe)
+      subject.detect_and_handle_a_pause
+    end
+
+    it "subscribes and restarts slow start when the pause file is removed" do
+      subject.instance_variable_set(:@processing_requests, false)
+      expect(subject).to receive(:subscribe)
+      subject.detect_and_handle_a_pause
+    end
+
+    it "never calls unsubscribe more than once per pause" do
+      allow(subject).to receive(:paused?).and_return(true)
+      expect(subject).to receive(:unsubscribe).once
+      subject.detect_and_handle_a_pause
+      subject.detect_and_handle_a_pause
+      subject.detect_and_handle_a_pause
+    end
+    it "never calls subscribe more than once per pause" do
+      subject.instance_variable_set(:@processing_requests, false)
+      expect(subject).to receive(:subscribe).once
+      subject.detect_and_handle_a_pause
+      subject.detect_and_handle_a_pause
+      subject.detect_and_handle_a_pause
+    end
+  end
+
   describe "#max_queue_size" do
     it "can be set via options hash" do
       expect(subject.max_queue_size).to eq(2)
@@ -36,6 +65,34 @@ describe ::Protobuf::Nats::Server do
       expect(subject.max_queue_size).to eq(10)
 
       ::ENV.delete("PB_NATS_SERVER_MAX_QUEUE_SIZE")
+    end
+  end
+
+  describe "pause_file_path" do
+    it "is nil by default" do
+      expect(subject.pause_file_path).to eq(nil)
+    end
+
+    it "can be set via PB_NATS_SERVER_PAUSE_FILE_PATH environment variable" do
+      ::ENV["PB_NATS_SERVER_PAUSE_FILE_PATH"] = "/tmp/rpc-paused-bro"
+
+      expect(subject.pause_file_path).to eq("/tmp/rpc-paused-bro")
+
+      ::ENV.delete("PB_NATS_SERVER_PAUSE_FILE_PATH")
+    end
+  end
+
+  describe "#paused?" do
+    let(:test_file) { "#{::SecureRandom.uuid}-testing-123" }
+    # Ensure the test file is always cleaned up.
+    after { ::File.delete(test_file) if ::File.exist?(test_file) }
+
+    it "pauses when a pause file is set" do
+      ::ENV["PB_NATS_SERVER_PAUSE_FILE_PATH"] = test_file
+      expect(subject).to_not be_paused
+      ::File.write(test_file, "")
+      expect(subject).to be_paused
+      ::ENV.delete("PB_NATS_SERVER_PAUSE_FILE_PATH")
     end
   end
 
@@ -67,9 +124,9 @@ describe ::Protobuf::Nats::Server do
     end
   end
 
-  describe "#subscribe_to_services" do
+  describe "#subscribe_to_services_once" do
     it "subscribes to services that inherit from protobuf rpc service" do
-      subject.subscribe_to_services
+      subject.subscribe_to_services_once
       expect(client.subscriptions.keys).to eq(["rpc.some_random_service.implemented"])
     end
   end
