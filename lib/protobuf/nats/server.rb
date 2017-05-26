@@ -153,7 +153,11 @@ module Protobuf
         end
 
         print_subscription_keys
-        subscribe { yield if block_given? }
+        if paused?
+          yield if block_given?
+        else
+          subscribe { yield if block_given? }
+        end
 
         loop do
           break unless @running
