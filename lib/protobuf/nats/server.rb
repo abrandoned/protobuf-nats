@@ -13,6 +13,7 @@ module Protobuf
 
       def initialize(options)
         @options = options
+        @processing_requests = true
         @running = true
         @stopped = false
 
@@ -59,6 +60,10 @@ module Protobuf
         was_enqueued
       end
 
+      def pause_file_path
+        ::ENV.fetch("PB_NATS_SERVER_PAUSE_FILE_PATH", nil)
+      end
+
       def print_subscription_keys
         logger.info "Creating subscriptions:"
 
@@ -67,7 +72,7 @@ module Protobuf
         end
       end
 
-      def subscribe_to_services
+      def subscribe_to_services_once
         with_each_subscription_key do |subscription_key_and_queue|
           subscriptions << nats.subscribe(subscription_key_and_queue, :queue => subscription_key_and_queue) do |request_data, reply_id, _subject|
             unless enqueue_request(request_data, reply_id)
@@ -100,13 +105,34 @@ module Protobuf
         # We have (X - 1) here because we always subscribe at least once.
         (subscriptions_per_rpc_endpoint - 1).times do
           next unless @running
+          next if paused?
           completed += 1
           sleep slow_start_delay
-          subscribe_to_services
+          subscribe_to_services_once
           logger.info "Slow start adding another round of subscriptions (#{completed}/#{subscriptions_per_rpc_endpoint})..."
         end
 
         logger.info "Slow start finished."
+      end
+
+      def detect_and_handle_a_pause
+        case
+        # If we are taking requests and detect a pause file, then unsubscribe.
+        when @processing_requests && paused?
+          @processing_requests = false
+          logger.warn("Pausing server!")
+          unsubscribe
+
+        # If we were paused and the pause file is no longer present, then subscribe again.
+        when !@processing_requests && !paused?
+          logger.warn("Resuming server: resubscribing to all services and restarting slow start!")
+          @processing_requests = true
+          subscribe
+        end
+      end
+
+      def paused?
+        !pause_file_path.nil? && ::File.exist?(pause_file_path)
       end
 
       def run
@@ -127,19 +153,19 @@ module Protobuf
         end
 
         print_subscription_keys
-        subscribe_to_services
-        yield if block_given?
-        finish_slow_start
+        if paused?
+          yield if block_given?
+        else
+          subscribe { yield if block_given? }
+        end
 
         loop do
           break unless @running
+          detect_and_handle_a_pause
           sleep 1
         end
 
-        logger.info "Unsubscribing from rpc routes..."
-        subscriptions.each do |subscription_id|
-          nats.unsubscribe(subscription_id)
-        end
+        unsubscribe
 
         logger.info "Waiting up to 60 seconds for the thread pool to finish shutting down..."
         thread_pool.shutdown
@@ -154,6 +180,19 @@ module Protobuf
 
       def stop
         @running = false
+      end
+
+      def subscribe
+        subscribe_to_services_once
+        yield if block_given?
+        finish_slow_start
+      end
+
+      def unsubscribe
+        logger.info "Unsubscribing from rpc routes..."
+        subscriptions.each do |subscription_id|
+          nats.unsubscribe(subscription_id)
+        end
       end
     end
   end
