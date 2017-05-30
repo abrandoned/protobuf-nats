@@ -4,7 +4,6 @@ module Protobuf
 
       def initialize(size, opts = {})
         @queue = ::Queue.new
-        @active_work = 0
 
         # Callbacks
         @error_cb = lambda {|_error|}
@@ -23,7 +22,7 @@ module Protobuf
       end
 
       def full?
-        @active_work >= @max_size
+        @queue.size >= @max_size
       end
 
       # This method is not thread safe by design since our IO model is a single producer thread
@@ -32,7 +31,6 @@ module Protobuf
         return false if full?
         return false if @shutting_down
         @queue << [:work, work_cb]
-        @mutex.synchronize { @active_work += 1 }
         supervise_workers
         true
       end
@@ -67,7 +65,7 @@ module Protobuf
       end
 
       def size
-        @active_work
+        @queue.size
       end
 
     private
@@ -96,8 +94,6 @@ module Protobuf
               # Update stats
             rescue => error
               @cb_mutex.synchronize { @error_cb.call(error) }
-            ensure
-              @mutex.synchronize { @active_work -= 1 }
             end
           end
         end
