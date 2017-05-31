@@ -189,15 +189,6 @@ module Protobuf
           nats.unsubscribe(sid) if response.nil?
         end
 
-        # This is a copy of #with_nats_timeout
-        def with_timeout(timeout)
-          start_time = ::NATS::MonotonicTime.now
-          yield
-          end_time = ::NATS::MonotonicTime.now
-          duration = end_time - start_time
-          raise ::NATS::IO::Timeout.new("nats: timeout") if duration > timeout
-        end
-
       end
 
     end
