@@ -122,19 +122,12 @@ module Protobuf
           fail(::NATS::IO::Timeout, subject) if second_message.nil?
 
           # Check messages
-          response = nil
-          has_ack = false
-          case first_message.data
-          when ::Protobuf::Nats::Messages::ACK then has_ack = true
-          else response = first_message.data
-          end
-          case second_message.data
-          when ::Protobuf::Nats::Messages::ACK then has_ack = true
-          else response = second_message.data
-          end
+          response = case ::Protobuf::Nats::Messages::ACK
+                     when first_message.data then second_message.data
+                     when second_message.data then first_message.data
+                     end
 
-          success = has_ack && response
-          fail(::NATS::IO::Timeout, subject) unless success
+          fail(::NATS::IO::Timeout, subject) unless response
 
           response
         ensure
@@ -180,17 +173,12 @@ module Protobuf
             second_message = messages.shift
           end
 
-          case first_message
-          when ::Protobuf::Nats::Messages::ACK then has_ack = true
-          else response = first_message
-          end
-          case second_message
-          when ::Protobuf::Nats::Messages::ACK then has_ack = true
-          else response = second_message
-          end
+          response = case ::Protobuf::Nats::Messages::ACK
+                     when first_message then second_message
+                     when second_message then first_message
+                     end
 
-          success = has_ack && response
-          fail(::NATS::IO::Timeout, subject) unless success
+          fail(::NATS::IO::Timeout, subject) unless response
 
           response
         ensure
