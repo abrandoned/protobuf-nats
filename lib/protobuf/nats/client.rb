@@ -7,9 +7,6 @@ module Protobuf
     class Client < ::Protobuf::Rpc::Connectors::Base
       NACK_BACKOFF_INTERVALS = [0, 1, 3, 5, 10]
 
-      class NackError < RuntimeError
-      end
-
       def initialize(options)
         # may need to override to setup connection at this stage ... may also do on load of class
         super
