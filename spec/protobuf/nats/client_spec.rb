@@ -84,11 +84,11 @@ describe ::Protobuf::Nats::Client do
       expect(server_response).to eq(response)
     end
 
-    it "raises an error when the ack is not signaled" do
+    it "returns immediately when the response is received first" do
       client.schedule_messages([::FakeNatsClient::Message.new(inbox, response, 0.05)])
 
       options = {:ack_timeout => 0.1, :timeout => 0.2}
-      expect { subject.nats_request_with_two_responses(msg_subject, "request data", options) }.to raise_error(::NATS::IO::Timeout)
+      expect(subject.nats_request_with_two_responses(msg_subject, "request data", options)).to eq(response)
     end
 
     it "can send messages out of order and still complete" do
@@ -106,18 +106,18 @@ describe ::Protobuf::Nats::Client do
       expect { subject.nats_request_with_two_responses(msg_subject, "request data", options) }.to raise_error(::NATS::IO::Timeout)
     end
 
-    it "raises an error when the server responds with nack" do
+    it "returns :nack when the server responds with nack" do
       client.schedule_messages([::FakeNatsClient::Message.new(inbox, nack, 0.05)])
 
       options = {:timeout => 0.1}
-      expect { subject.nats_request_with_two_responses(msg_subject, "request data", options) }.to raise_error(::Protobuf::Nats::Client::NackError)
+      expect(subject.nats_request_with_two_responses(msg_subject, "request data", options)).to eq(:nack)
     end
   end
 
   describe "#send_request" do
     it "retries 3 times when and raises a NATS timeout" do
       expect(subject).to receive(:setup_connection).exactly(3).times
-      expect(subject).to receive(:nats_request_with_two_responses).and_raise(::NATS::IO::Timeout).exactly(3).times
+      expect(subject).to receive(:nats_request_with_two_responses).and_return(:ack_timeout).exactly(3).times
       expect { subject.send_request }.to raise_error(::NATS::IO::Timeout)
     end
 
@@ -128,7 +128,7 @@ describe ::Protobuf::Nats::Client do
       expect(subject).to receive(:setup_connection).exactly(6).times
       expect(subject).to receive(:nats_request_with_two_responses).exactly(6).times.and_call_original
       t_start = Time.now.to_f
-      expect { subject.send_request }.to raise_error(::Protobuf::Nats::Client::NackError)
+      expect { subject.send_request }.to raise_error(::NATS::IO::Timeout)
       t_end = Time.now.to_f
       expect(t_end - t_start).to be_within(0.06).of(total_backoff/1000.0)
     end
