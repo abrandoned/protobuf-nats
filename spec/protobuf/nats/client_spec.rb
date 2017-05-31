@@ -69,6 +69,7 @@ describe ::Protobuf::Nats::Client do
     let(:inbox) { "INBOX_123" }
     let(:msg_subject) { "rpc.yolo.brolo" }
     let(:ack) { ::Protobuf::Nats::Messages::ACK }
+    let(:nack) { ::Protobuf::Nats::Messages::NACK }
     let(:response) { "final count down" }
 
     before do
@@ -103,6 +104,13 @@ describe ::Protobuf::Nats::Client do
 
       options = {:timeout => 0.1}
       expect { subject.nats_request_with_two_responses(msg_subject, "request data", options) }.to raise_error(::NATS::IO::Timeout)
+    end
+
+    it "raises an error when the server responds with nack" do
+      client.schedule_messages([::FakeNatsClient::Message.new(inbox, nack, 0.05)])
+
+      options = {:timeout => 0.1}
+      expect { subject.nats_request_with_two_responses(msg_subject, "request data", options) }.to raise_error(Protobuf::Nats::Client::NackError)
     end
   end
 

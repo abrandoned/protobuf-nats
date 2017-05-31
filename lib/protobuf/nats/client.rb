@@ -5,6 +5,11 @@ require "monitor"
 module Protobuf
   module Nats
     class Client < ::Protobuf::Rpc::Connectors::Base
+      NACK_BACKOFF_INTERVALS = [0, 1, 3, 5, 10]
+
+      class NackError < RuntimeError
+      end
+
       def initialize(options)
         # may need to override to setup connection at this stage ... may also do on load of class
         super
@@ -47,6 +52,7 @@ module Protobuf
 
       def send_request
         retries ||= 3
+        nack_retry ||= 0
 
         setup_connection
         request_options = {:timeout => response_timeout, :ack_timeout => ack_timeout}
@@ -65,6 +71,12 @@ module Protobuf
         # Nats response timeout.
         retry if (retries -= 1) > 0
         raise
+      rescue NackError
+        interval = NACK_BACKOFF_INTERVALS[nack_retry]
+        nack_retry += 1
+        raise if interval.nil?
+        sleep (interval + rand(10))/1000.0
+        retry
       end
 
       def cached_subscription_key
@@ -101,6 +113,7 @@ module Protobuf
           # Wait for reply
           first_message = nats.next_message(sub, ack_timeout)
           fail ::NATS::IO::Timeout if first_message.nil?
+          fail NackError if first_message == ::Protobuf::Nats::Messages::NACK
           second_message = nats.next_message(sub, timeout)
           fail ::NATS::IO::Timeout if second_message.nil?
 
@@ -140,6 +153,10 @@ module Protobuf
               when ::Protobuf::Nats::Messages::ACK
                 ack_condition.signal
                 next
+              when ::Protobuf::Nats::Messages::NACK
+                response = ::Protobuf::Nats::Messages::NACK
+                ack_condition.signal
+                next
               else
                 response = message
                 pb_response_condition.signal
@@ -159,6 +176,8 @@ module Protobuf
             timeout = opts[:timeout] || 60
             with_timeout(timeout) { pb_response_condition.wait(timeout) } unless response
           end
+
+          fail NackError if response == ::Protobuf::Nats::Messages::NACK
 
           response
         ensure
