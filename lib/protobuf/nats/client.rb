@@ -117,7 +117,6 @@ module Protobuf
           first_message = nats.next_message(sub, ack_timeout)
           return :ack_timeout if first_message.nil?
           return :nack if first_message.data == ::Protobuf::Nats::Messages::NACK
-          return first_message.data unless first_message.data == ::Protobuf::Nats::Messages::ACK
 
           second_message = nats.next_message(sub, timeout)
           fail(::NATS::IO::Timeout, subject) if second_message.nil?
@@ -151,37 +150,46 @@ module Protobuf
           lock = ::Monitor.new
           received = lock.new_cond
           messages = []
+          first_message = nil
+          second_message = nil
           response = nil
-          sid = nil
+          has_ack = false
+
+          sid = nats.subscribe(inbox, :max => 2) do |message, _, _|
+            lock.synchronize do
+              messages << message
+              received.signal
+            end
+          end
 
           lock.synchronize do
-            sid = nats.subscribe(inbox, :max => 2) do |message, _, _|
-              lock.synchronize do
-                messages << message
-                received.signal
-              end
-            end
-
             # Publish to server
             nats.publish(subject, data, inbox)
 
             # Wait for the ACK from the server
             ack_timeout = opts[:ack_timeout] || 5
-            received.wait(ack_timeout)
-            response = messages.shift
+            received.wait(ack_timeout) if messages.empty?
+            first_message = messages.shift
 
-            return :ack_timeout if response.nil?
-            return :nack if response == ::Protobuf::Nats::Messages::NACK
-            return response unless response == ::Protobuf::Nats::Messages::ACK
+            return :ack_timeout if first_message.nil?
+            return :nack if first_message == ::Protobuf::Nats::Messages::NACK
 
             # Wait for the protobuf response
-            response = nil
             timeout = opts[:timeout] || 60
             received.wait(timeout) if messages.empty?
-            response = messages.shift
+            second_message = messages.shift
           end
 
-          raise ::NATS::IO::Timeout if response.nil?
+          case first_message
+          when ::Protobuf::Nats::Messages::ACK then has_ack = true
+          else response = first_message
+          end
+          case second_message
+          when ::Protobuf::Nats::Messages::ACK then has_ack = true
+          else response = second_message
+          end
+
+          fail(::NATS::IO::Timeout, subject) if response.nil?
 
           response
         ensure
