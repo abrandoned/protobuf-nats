@@ -124,6 +124,7 @@ describe ::Protobuf::Nats::Client do
     it "tries 6 times when the server responds with NACK" do
       inbox = "INBOX-123"
       client = ::FakeNatsClient.new(:inbox => inbox)
+      total_backoff = ::Protobuf::Nats::Client::NACK_BACKOFF_INTERVALS.reduce { |total, interval| total += interval }
       def client.subscribe(subject, args, &block)
         block.call(::Protobuf::Nats::Client::NackError)
       end
@@ -133,7 +134,7 @@ describe ::Protobuf::Nats::Client do
       t_start = Time.now.to_f
       expect { subject.send_request }.to raise_error(::Protobuf::Nats::Client::NackError)
       t_end = Time.now.to_f
-      expect(t_end - t_start).to be_within(0.1).of(::Protobuf::Nats::Client::NACK_BACKOFF_INTERVALS.sum/1000.0)
+      expect(t_end - t_start).to be_within(0.1).of(total_backoff/1000.0)
     end
 
     it "waits the reconnect_delay duration when the nats connection is reconnecting" do
