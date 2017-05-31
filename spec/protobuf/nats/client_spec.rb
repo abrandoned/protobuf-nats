@@ -108,6 +108,8 @@ describe ::Protobuf::Nats::Client do
 
     it "raises an error when the server responds with nack" do
       client.schedule_messages([::FakeNatsClient::Message.new(inbox, nack, 0.05)])
+
+      options = {:timeout => 0.1}
       expect { subject.nats_request_with_two_responses(msg_subject, "request data", options) }.to raise_error(::Protobuf::Nats::Client::NackError)
     end
   end

@@ -113,7 +113,7 @@ module Protobuf
           # Wait for reply
           first_message = nats.next_message(sub, ack_timeout)
           fail ::NATS::IO::Timeout if first_message.nil?
-          fail NackError if first_message == ::Protobuf::Nats::Messages::NACK
+          fail NackError if first_message.data == ::Protobuf::Nats::Messages::NACK
           second_message = nats.next_message(sub, timeout)
           fail ::NATS::IO::Timeout if second_message.nil?
 
