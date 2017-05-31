@@ -189,7 +189,8 @@ module Protobuf
           else response = second_message
           end
 
-          fail(::NATS::IO::Timeout, subject) if response.nil?
+          success = has_ack && response
+          fail(::NATS::IO::Timeout, subject) unless success
 
           response
         ensure
