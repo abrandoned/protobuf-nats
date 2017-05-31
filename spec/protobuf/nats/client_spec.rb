@@ -123,7 +123,7 @@ describe ::Protobuf::Nats::Client do
 
     it "tries 6 times when the server responds with NACK" do
       client = ::FakeNackClient.new
-      total_backoff = ::Protobuf::Nats::Client::NACK_BACKOFF_INTERVALS.reduce { |total, interval| total += interval }
+      total_backoff = 9 + 10 + 12 + 14 + 19
       allow(::Protobuf::Nats).to receive(:client_nats_connection).and_return(client)
       expect(subject).to receive(:setup_connection).exactly(6).times
       expect(subject).to receive(:nats_request_with_two_responses).exactly(6).times.and_call_original
