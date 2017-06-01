@@ -180,7 +180,6 @@ describe ::Protobuf::Nats::Client do
         ::ENV["PB_NATS_CLIENT_NACK_BACKOFF_INTERVALS"] = "100,100,100"
         ::ENV["PB_NATS_CLIENT_NACK_BACKOFF_SPLAY_LIMIT"] = "3333"
         client = ::FakeNackClient.new
-        total_backoff = 400
         allow(::Protobuf::Nats).to receive(:client_nats_connection).and_return(client)
         expect(subject).to receive(:setup_connection).exactly(4).times
         expect(subject).to receive(:rand).with(3333).and_return(0)
