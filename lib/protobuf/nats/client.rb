@@ -5,11 +5,6 @@ require "monitor"
 module Protobuf
   module Nats
     class Client < ::Protobuf::Rpc::Connectors::Base
-      NACK_BACKOFF_INTERVALS = [0, 1, 3, 5, 10]
-
-      class NackError < RuntimeError
-      end
-
       def initialize(options)
         # may need to override to setup connection at this stage ... may also do on load of class
         super
@@ -31,6 +26,30 @@ module Protobuf
           ::ENV["PB_NATS_CLIENT_ACK_TIMEOUT"].to_i
         else
           5
+        end
+      end
+
+      def nack_backoff_intervals
+        @nack_backoff_intervals ||= if ::ENV.key?("PB_NATS_CLIENT_NACK_BACKOFF_INTERVALS")
+          ::ENV["PB_NATS_CLIENT_NACK_BACKOFF_INTERVALS"].split(",").map(&:to_i)
+        else
+          [0, 1, 3, 5, 10]
+        end
+      end
+
+      def nack_backoff_splay
+        @nack_backoff_splay ||= if nack_backoff_splay_limit > 0
+          rand(nack_backoff_splay_limit)
+        else
+          0
+        end
+      end
+
+      def nack_backoff_splay_limit
+        @nack_backoff_splay_limit ||= if ::ENV.key?("PB_NATS_CLIENT_NACK_BACKOFF_SPLAY_LIMIT")
+          ::ENV["PB_NATS_CLIENT_NACK_BACKOFF_SPLAY_LIMIT"].to_i
+        else
+          10
         end
       end
 
@@ -63,10 +82,10 @@ module Protobuf
             next if (retries -= 1) > 0
             raise ::NATS::IO::Timeout
           when :nack
-            interval = NACK_BACKOFF_INTERVALS[nack_retry]
+            interval = nack_backoff_intervals[nack_retry]
             nack_retry += 1
             raise ::NATS::IO::Timeout if interval.nil?
-            sleep (interval + rand(10))/1000.0
+            sleep((interval + nack_backoff_splay)/1000.0)
             next
           end
           break
@@ -120,25 +139,17 @@ module Protobuf
           first_message = nats.next_message(sub, ack_timeout)
           return :ack_timeout if first_message.nil?
           return :nack if first_message.data == ::Protobuf::Nats::Messages::NACK
-          return first_message.data unless first_message.data == ::Protobuf::Nats::Messages::ACK
 
           second_message = nats.next_message(sub, timeout)
           fail(::NATS::IO::Timeout, subject) if second_message.nil?
 
           # Check messages
-          response = nil
-          has_ack = false
-          case first_message.data
-          when ::Protobuf::Nats::Messages::ACK then has_ack = true
-          else response = first_message.data
-          end
-          case second_message.data
-          when ::Protobuf::Nats::Messages::ACK then has_ack = true
-          else response = second_message.data
-          end
+          response = case ::Protobuf::Nats::Messages::ACK
+                     when first_message.data then second_message.data
+                     when second_message.data then first_message.data
+                     end
 
-          success = has_ack && response
-          fail(::NATS::IO::Timeout, subject) unless success
+          fail(::NATS::IO::Timeout, subject) unless response
 
           response
         ensure
@@ -154,51 +165,46 @@ module Protobuf
           lock = ::Monitor.new
           received = lock.new_cond
           messages = []
+          first_message = nil
+          second_message = nil
           response = nil
-          sid = nil
+
+          sid = nats.subscribe(inbox, :max => 2) do |message, _, _|
+            lock.synchronize do
+              messages << message
+              received.signal
+            end
+          end
 
           lock.synchronize do
-            sid = nats.subscribe(inbox, :max => 2) do |message, _, _|
-              lock.synchronize do
-                messages << message
-                received.signal
-              end
-            end
-
             # Publish to server
             nats.publish(subject, data, inbox)
 
             # Wait for the ACK from the server
             ack_timeout = opts[:ack_timeout] || 5
-            received.wait(ack_timeout)
-            response = messages.shift
+            received.wait(ack_timeout) if messages.empty?
+            first_message = messages.shift
 
-            return :ack_timeout if response.nil?
-            return :nack if response == ::Protobuf::Nats::Messages::NACK
-            return response unless response == ::Protobuf::Nats::Messages::ACK
+            return :ack_timeout if first_message.nil?
+            return :nack if first_message == ::Protobuf::Nats::Messages::NACK
 
             # Wait for the protobuf response
-            response = nil
             timeout = opts[:timeout] || 60
             received.wait(timeout) if messages.empty?
-            response = messages.shift
+            second_message = messages.shift
           end
 
-          raise ::NATS::IO::Timeout if response.nil?
+          response = case ::Protobuf::Nats::Messages::ACK
+                     when first_message then second_message
+                     when second_message then first_message
+                     end
+
+          fail(::NATS::IO::Timeout, subject) unless response
 
           response
         ensure
           # Ensure we don't leave a subscription sitting around.
           nats.unsubscribe(sid) if response.nil?
-        end
-
-        # This is a copy of #with_nats_timeout
-        def with_timeout(timeout)
-          start_time = ::NATS::MonotonicTime.now
-          yield
-          end_time = ::NATS::MonotonicTime.now
-          duration = end_time - start_time
-          raise ::NATS::IO::Timeout.new("nats: timeout") if duration > timeout
         end
 
       end
