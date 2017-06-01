@@ -29,6 +29,30 @@ module Protobuf
         end
       end
 
+      def nack_backoff_intervals
+        @nack_backoff_intervals ||= if ::ENV.key?("PB_NATS_CLIENT_NACK_BACKOFF_INTERVALS")
+          ::ENV["PB_NATS_CLIENT_NACK_BACKOFF_INTERVALS"].split(",").map(&:to_i)
+        else
+          [0, 1, 3, 5, 10]
+        end
+      end
+
+      def nack_backoff_splay
+        @nack_backoff_splay ||= if nack_backoff_splay_limit > 0
+          rand(nack_backoff_splay_limit)
+        else
+          0
+        end
+      end
+
+      def nack_backoff_splay_limit
+        @nack_backoff_splay_limit ||= if ::ENV.key?("PB_NATS_CLIENT_NACK_BACKOFF_SPLAY_LIMIT")
+          ::ENV["PB_NATS_CLIENT_NACK_BACKOFF_SPLAY_LIMIT"].to_i
+        else
+          10
+        end
+      end
+
       def reconnect_delay
         @reconnect_delay ||= if ::ENV.key?("PB_NATS_CLIENT_RECONNECT_DELAY")
           ::ENV["PB_NATS_CLIENT_RECONNECT_DELAY"].to_i
@@ -47,11 +71,28 @@ module Protobuf
 
       def send_request
         retries ||= 3
+        nack_retry ||= 0
 
-        setup_connection
-        request_options = {:timeout => response_timeout, :ack_timeout => ack_timeout}
-        @response_data = nats_request_with_two_responses(cached_subscription_key, @request_data, request_options)
+        loop do
+          setup_connection
+          request_options = {:timeout => response_timeout, :ack_timeout => ack_timeout}
+          @response_data = nats_request_with_two_responses(cached_subscription_key, @request_data, request_options)
+          case @response_data
+          when :ack_timeout
+            next if (retries -= 1) > 0
+            raise ::NATS::IO::Timeout
+          when :nack
+            interval = nack_backoff_intervals[nack_retry]
+            nack_retry += 1
+            raise ::NATS::IO::Timeout if interval.nil?
+            sleep((interval + nack_backoff_splay)/1000.0)
+            next
+          end
+          break
+        end
+
         parse_response
+
       rescue ::Protobuf::Nats::Errors::IOException => error
         ::Protobuf::Nats.log_error(error)
 
@@ -59,10 +100,6 @@ module Protobuf
         logger.warn "An IOException was raised. We are going to sleep for #{delay} seconds."
         sleep delay
 
-        retry if (retries -= 1) > 0
-        raise
-      rescue ::NATS::IO::Timeout
-        # Nats response timeout.
         retry if (retries -= 1) > 0
         raise
       end
@@ -100,24 +137,19 @@ module Protobuf
 
           # Wait for reply
           first_message = nats.next_message(sub, ack_timeout)
-          fail ::NATS::IO::Timeout if first_message.nil?
+          return :ack_timeout if first_message.nil?
+          return :nack if first_message.data == ::Protobuf::Nats::Messages::NACK
+
           second_message = nats.next_message(sub, timeout)
-          fail ::NATS::IO::Timeout if second_message.nil?
+          fail(::NATS::IO::Timeout, subject) if second_message.nil?
 
           # Check messages
-          response = nil
-          has_ack = false
-          case first_message.data
-          when ::Protobuf::Nats::Messages::ACK then has_ack = true
-          else response = first_message.data
-          end
-          case second_message.data
-          when ::Protobuf::Nats::Messages::ACK then has_ack = true
-          else response = second_message.data
-          end
+          response = case ::Protobuf::Nats::Messages::ACK
+                     when first_message.data then second_message.data
+                     when second_message.data then first_message.data
+                     end
 
-          success = has_ack && response
-          fail(::NATS::IO::Timeout, subject) unless success
+          fail(::NATS::IO::Timeout, subject) unless response
 
           response
         ensure
@@ -131,19 +163,16 @@ module Protobuf
           nats = Protobuf::Nats.client_nats_connection
           inbox = nats.new_inbox
           lock = ::Monitor.new
-          ack_condition = lock.new_cond
-          pb_response_condition = lock.new_cond
+          received = lock.new_cond
+          messages = []
+          first_message = nil
+          second_message = nil
           response = nil
+
           sid = nats.subscribe(inbox, :max => 2) do |message, _, _|
             lock.synchronize do
-              case message
-              when ::Protobuf::Nats::Messages::ACK
-                ack_condition.signal
-                next
-              else
-                response = message
-                pb_response_condition.signal
-              end
+              messages << message
+              received.signal
             end
           end
 
@@ -153,26 +182,29 @@ module Protobuf
 
             # Wait for the ACK from the server
             ack_timeout = opts[:ack_timeout] || 5
-            with_timeout(ack_timeout) { ack_condition.wait(ack_timeout) }
+            received.wait(ack_timeout) if messages.empty?
+            first_message = messages.shift
+
+            return :ack_timeout if first_message.nil?
+            return :nack if first_message == ::Protobuf::Nats::Messages::NACK
 
             # Wait for the protobuf response
             timeout = opts[:timeout] || 60
-            with_timeout(timeout) { pb_response_condition.wait(timeout) } unless response
+            received.wait(timeout) if messages.empty?
+            second_message = messages.shift
           end
+
+          response = case ::Protobuf::Nats::Messages::ACK
+                     when first_message then second_message
+                     when second_message then first_message
+                     end
+
+          fail(::NATS::IO::Timeout, subject) unless response
 
           response
         ensure
           # Ensure we don't leave a subscription sitting around.
           nats.unsubscribe(sid) if response.nil?
-        end
-
-        # This is a copy of #with_nats_timeout
-        def with_timeout(timeout)
-          start_time = ::NATS::MonotonicTime.now
-          yield
-          end_time = ::NATS::MonotonicTime.now
-          duration = end_time - start_time
-          raise ::NATS::IO::Timeout.new("nats: timeout") if duration > timeout
         end
 
       end

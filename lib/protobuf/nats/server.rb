@@ -55,7 +55,11 @@ module Protobuf
         end
 
         # Publish an ACK to signal the server has picked up the work.
-        nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK) if was_enqueued
+        if was_enqueued
+          nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK)
+        else
+          nats.publish(reply_id, ::Protobuf::Nats::Messages::NACK)
+        end
 
         was_enqueued
       end

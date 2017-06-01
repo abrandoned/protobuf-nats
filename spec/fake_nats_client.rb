@@ -57,3 +57,13 @@ class FakeNatsClient
     end
   end
 end
+
+class FakeNackClient < FakeNatsClient
+  def subscribe(subject, args, &block)
+    Thread.new { block.call(::Protobuf::Nats::Messages::NACK) }
+  end
+
+  def next_message(_sub, _timeout)
+    FakeNatsClient::Message.new("", ::Protobuf::Nats::Messages::NACK, 0)
+  end
+end
