@@ -166,32 +166,12 @@ describe ::Protobuf::Nats::Client do
       client = ::FakeNackClient.new
       allow(::Protobuf::Nats).to receive(:client_nats_connection).and_return(client)
       allow(subject).to receive(:nack_backoff_splay).and_return(10)
-      allow(subject).to receive(:nack_backoff_intervals).and_return([100])
-      expect(subject).to receive(:setup_connection).exactly(2).times
-      expect(subject).to receive(:nats_request_with_two_responses).exactly(2).times.and_call_original
-      start = Time.now.to_f
+      allow(subject).to receive(:nack_backoff_intervals).and_return([10, 20])
+      expect(subject).to receive(:sleep).with(20*0.001).ordered
+      expect(subject).to receive(:sleep).with(30*0.001).ordered
+      expect(subject).to receive(:setup_connection).exactly(3).times
+      expect(subject).to receive(:nats_request_with_two_responses).exactly(3).times.and_call_original
       expect { subject.send_request }.to raise_error(::NATS::IO::Timeout)
-      duration = (Time.now.to_f - start) * 1000
-      expect(duration).to be_within(15).of(110)
-    end
-
-    it "respects PB_NATS_CLIENT_NACK_BACKOFF_INTERVALS and PB_NATS_CLIENT_NACK_BACKOFF_SPLAY_LIMIT" do
-      begin
-        ::ENV["PB_NATS_CLIENT_NACK_BACKOFF_INTERVALS"] = "100,100,100"
-        ::ENV["PB_NATS_CLIENT_NACK_BACKOFF_SPLAY_LIMIT"] = "3333"
-        client = ::FakeNackClient.new
-        allow(::Protobuf::Nats).to receive(:client_nats_connection).and_return(client)
-        expect(subject).to receive(:setup_connection).exactly(4).times
-        expect(subject).to receive(:rand).with(3333).and_return(0)
-        expect(subject).to receive(:nats_request_with_two_responses).exactly(4).times.and_call_original
-        t_start = Time.now.to_f
-        expect { subject.send_request }.to raise_error(::NATS::IO::Timeout)
-        duration = (Time.now.to_f - t_start) * 1000
-        expect(duration).to be_within(15).of(300)
-      ensure
-        ::ENV.delete("PB_NATS_CLIENT_NACK_BACKOFF_INTERVALS")
-        ::ENV.delete("PB_NATS_CLIENT_NACK_BACKOFF_SPLAY_LIMIT")
-      end
     end
 
     it "waits the reconnect_delay duration when the nats connection is reconnecting" do
