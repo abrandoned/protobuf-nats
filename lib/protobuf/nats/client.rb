@@ -5,8 +5,6 @@ require "monitor"
 module Protobuf
   module Nats
     class Client < ::Protobuf::Rpc::Connectors::Base
-      NACK_BACKOFF_INTERVALS = [0, 1, 3, 5, 10]
-
       def initialize(options)
         # may need to override to setup connection at this stage ... may also do on load of class
         super
@@ -28,6 +26,30 @@ module Protobuf
           ::ENV["PB_NATS_CLIENT_ACK_TIMEOUT"].to_i
         else
           5
+        end
+      end
+
+      def nack_backoff_intervals
+        @nack_backoff_intervals ||= if ::ENV.key?("PB_NATS_CLIENT_NACK_BACKOFF_INTERVALS")
+          ::ENV["PB_NATS_CLIENT_NACK_BACKOFF_INTERVALS"].split(",").map(&:to_i)
+        else
+          [0, 1, 3, 5, 10]
+        end
+      end
+
+      def nack_backoff_splay
+        @nack_backoff_splay ||= if nack_backoff_splay_limit > 0
+          rand(nack_backoff_splay_limit)
+        else
+          0
+        end
+      end
+
+      def nack_backoff_splay_limit
+        @nack_backoff_splay_limit ||= if ::ENV.key?("PB_NATS_CLIENT_NACK_BACKOFF_SPLAY_LIMIT")
+          ::ENV["PB_NATS_CLIENT_NACK_BACKOFF_SPLAY_LIMIT"].to_i
+        else
+          10
         end
       end
 
@@ -60,10 +82,10 @@ module Protobuf
             next if (retries -= 1) > 0
             raise ::NATS::IO::Timeout
           when :nack
-            interval = NACK_BACKOFF_INTERVALS[nack_retry]
+            interval = nack_backoff_intervals[nack_retry]
             nack_retry += 1
             raise ::NATS::IO::Timeout if interval.nil?
-            sleep (interval + rand(10))/1000.0
+            sleep((interval + nack_backoff_splay)/1000.0)
             next
           end
           break

@@ -123,14 +123,33 @@ describe ::Protobuf::Nats::Client do
 
     it "tries 6 times when the server responds with NACK" do
       client = ::FakeNackClient.new
-      total_backoff = 9 + 10 + 12 + 14 + 19
       allow(::Protobuf::Nats).to receive(:client_nats_connection).and_return(client)
+      allow(subject).to receive(:nack_backoff_splay).and_return(10)
       expect(subject).to receive(:setup_connection).exactly(6).times
       expect(subject).to receive(:nats_request_with_two_responses).exactly(6).times.and_call_original
-      t_start = Time.now.to_f
+      start = Time.now.to_f
       expect { subject.send_request }.to raise_error(::NATS::IO::Timeout)
-      t_end = Time.now.to_f
-      expect(t_end - t_start).to be_within(0.06).of(total_backoff/1000.0)
+      duration = (Time.now.to_f - start) * 1000
+      expect(duration).to be_within(15).of(10 + 11 + 13 + 15 + 20)
+    end
+
+    it "respects PB_NATS_CLIENT_NACK_BACKOFF_INTERVALS and PB_NATS_CLIENT_NACK_BACKOFF_SPLAY_LIMIT" do
+      begin
+        ::ENV["PB_NATS_CLIENT_NACK_BACKOFF_INTERVALS"] = "100,100,100"
+        ::ENV["PB_NATS_CLIENT_NACK_BACKOFF_SPLAY_LIMIT"] = "0"
+        client = ::FakeNackClient.new
+        total_backoff = 400
+        allow(::Protobuf::Nats).to receive(:client_nats_connection).and_return(client)
+        expect(subject).to receive(:setup_connection).exactly(4).times
+        expect(subject).to receive(:nats_request_with_two_responses).exactly(4).times.and_call_original
+        t_start = Time.now.to_f
+        expect { subject.send_request }.to raise_error(::NATS::IO::Timeout)
+        duration = (Time.now.to_f - t_start) * 1000
+        expect(duration).to be_within(15).of(300)
+      ensure
+        ::ENV.delete("PB_NATS_CLIENT_NACK_BACKOFF_INTERVALS")
+        ::ENV.delete("PB_NATS_CLIENT_NACK_BACKOFF_SPLAY_LIMIT")
+      end
     end
 
     it "waits the reconnect_delay duration when the nats connection is reconnecting" do
