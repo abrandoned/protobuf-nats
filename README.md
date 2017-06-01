@@ -38,6 +38,11 @@ used to allow JVM based servers to warm-up slowly to prevent jolts in runtime pe
 
 `PB_NATS_CLIENT_ACK_TIMEOUT` - Seconds to wait for an ACK from the rpc server (default: 5 seconds).
 
+`PB_NATS_CLIENT_NACK_BACKOFF_INTERVALS` - Array of milliseconds to wait between NACK retries (default: "0,1,3,5,10").
+
+`PB_NATS_CLIENT_NACK_BACKOFF_SPLAY_LIMIT` - Milliseconds to add to backoff timeout to avoid bursting retries (default:
+10 milliseconds).
+
 `PB_NATS_CLIENT_RESPONSE_TIMEOUT` - Seconds to wait for a non-ACK response from the rpc server (default: 60 seconds).
 
 `PB_NATS_CLIENT_RECONNECT_DELAY` - If we detect a reconnect delay, we will wait this many seconds (default: the ACK timeout).
