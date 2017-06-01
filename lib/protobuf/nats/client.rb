@@ -168,7 +168,6 @@ module Protobuf
           first_message = nil
           second_message = nil
           response = nil
-          has_ack = false
 
           sid = nats.subscribe(inbox, :max => 2) do |message, _, _|
             lock.synchronize do
