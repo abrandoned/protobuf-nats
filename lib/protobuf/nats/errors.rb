@@ -1,6 +1,15 @@
 module Protobuf
   module Nats
     module Errors
+      class Base < ::StandardError
+      end
+
+      class RequestTimeout < Base
+      end
+
+      class ResponseTimeout < Base
+      end
+
       class MriIOException < ::StandardError
       end
 
