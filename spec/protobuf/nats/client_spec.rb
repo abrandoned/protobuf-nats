@@ -125,11 +125,11 @@ describe ::Protobuf::Nats::Client do
       expect(server_response).to eq(response)
     end
 
-    it "raises an error when the ack is not signaled" do
+    it "returns an :ack_timeout when the ack is not signaled" do
       client.schedule_messages([::FakeNatsClient::Message.new(inbox, response, 0.05)])
 
       options = {:ack_timeout => 0.1, :timeout => 0.2}
-      expect { subject.nats_request_with_two_responses(msg_subject, "request data", options) }.to raise_error(::NATS::IO::Timeout)
+      expect(subject.nats_request_with_two_responses(msg_subject, "request data", options)).to eq(:ack_timeout)
     end
 
     it "can send messages out of order and still complete" do
@@ -144,7 +144,7 @@ describe ::Protobuf::Nats::Client do
       client.schedule_messages([::FakeNatsClient::Message.new(inbox, ack, 0.05)])
 
       options = {:timeout => 0.1}
-      expect { subject.nats_request_with_two_responses(msg_subject, "request data", options) }.to raise_error(::NATS::IO::Timeout)
+      expect { subject.nats_request_with_two_responses(msg_subject, "request data", options) }.to raise_error(::Protobuf::Nats::Errors::ResponseTimeout)
     end
 
     it "returns :nack when the server responds with nack" do
@@ -159,7 +159,7 @@ describe ::Protobuf::Nats::Client do
     it "retries 3 times when and raises a NATS timeout" do
       expect(subject).to receive(:setup_connection).exactly(3).times
       expect(subject).to receive(:nats_request_with_two_responses).and_return(:ack_timeout).exactly(3).times
-      expect { subject.send_request }.to raise_error(::NATS::IO::Timeout)
+      expect { subject.send_request }.to raise_error(::Protobuf::Nats::Errors::RequestTimeout)
     end
 
     it "retries when the server responds with NACK" do
@@ -171,7 +171,7 @@ describe ::Protobuf::Nats::Client do
       expect(subject).to receive(:sleep).with(30*0.001).ordered
       expect(subject).to receive(:setup_connection).exactly(3).times
       expect(subject).to receive(:nats_request_with_two_responses).exactly(3).times.and_call_original
-      expect { subject.send_request }.to raise_error(::NATS::IO::Timeout)
+      expect { subject.send_request }.to raise_error(::Protobuf::Nats::Errors::RequestTimeout)
     end
 
     it "waits the reconnect_delay duration when the nats connection is reconnecting" do

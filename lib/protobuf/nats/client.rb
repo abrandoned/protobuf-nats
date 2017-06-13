@@ -80,11 +80,11 @@ module Protobuf
           case @response_data
           when :ack_timeout
             next if (retries -= 1) > 0
-            raise ::NATS::IO::Timeout
+            raise ::Protobuf::Nats::Errors::RequestTimeout
           when :nack
             interval = nack_backoff_intervals[nack_retry]
             nack_retry += 1
-            raise ::NATS::IO::Timeout if interval.nil?
+            raise ::Protobuf::Nats::Errors::RequestTimeout if interval.nil?
             sleep((interval + nack_backoff_splay)/1000.0)
             next
           end
@@ -138,18 +138,20 @@ module Protobuf
           # Wait for reply
           first_message = nats.next_message(sub, ack_timeout)
           return :ack_timeout if first_message.nil?
-          return :nack if first_message.data == ::Protobuf::Nats::Messages::NACK
+          first_message_data = first_message.data
+          return :nack if first_message_data == ::Protobuf::Nats::Messages::NACK
 
           second_message = nats.next_message(sub, timeout)
-          fail(::NATS::IO::Timeout, subject) if second_message.nil?
+          second_message_data = second_message.nil? ? nil : second_message.data
 
           # Check messages
           response = case ::Protobuf::Nats::Messages::ACK
-                     when first_message.data then second_message.data
-                     when second_message.data then first_message.data
+                     when first_message_data then second_message_data
+                     when second_message_data then first_message_data
+                     else return :ack_timeout
                      end
 
-          fail(::NATS::IO::Timeout, subject) unless response
+          fail(::Protobuf::Nats::Errors::ResponseTimeout, subject) unless response
 
           response
         ensure
@@ -197,9 +199,10 @@ module Protobuf
           response = case ::Protobuf::Nats::Messages::ACK
                      when first_message then second_message
                      when second_message then first_message
+                     else return :ack_timeout
                      end
 
-          fail(::NATS::IO::Timeout, subject) unless response
+          fail(::Protobuf::Nats::Errors::ResponseTimeout, subject) unless response
 
           response
         ensure
