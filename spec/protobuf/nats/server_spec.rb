@@ -132,12 +132,14 @@ describe ::Protobuf::Nats::Server do
   end
 
   describe "#enqueue_request" do
-    it "returns false when the thread pool and thread pool queue is full" do
+    it "returns false when the thread pool and thread pool queue is full and publish NACK" do
       # Fill the thread pool.
       2.times { subject.thread_pool.push { sleep 1 } }
       # Fill the thread pool queue.
       2.times { subject.thread_pool.push { sleep 1 } }
-      expect(subject.enqueue_request("", "")).to eq(false)
+
+      expect(subject.nats).to receive(:publish).with("inbox_123", ::Protobuf::Nats::Messages::NACK)
+      expect(subject.enqueue_request("", "inbox_123")).to eq(false)
     end
 
     it "sends an ACK if the thread pool enqueued the task" do

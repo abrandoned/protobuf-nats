@@ -58,8 +58,7 @@ module Protobuf
         if was_enqueued
           nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK)
         else
-          # TODO: Uncomment once we can roll out NACK messages without a 60 second timeout
-          # nats.publish(reply_id, ::Protobuf::Nats::Messages::NACK)
+          nats.publish(reply_id, ::Protobuf::Nats::Messages::NACK)
         end
 
         was_enqueued
