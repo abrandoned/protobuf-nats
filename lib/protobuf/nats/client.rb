@@ -104,7 +104,7 @@ module Protobuf
         # Avoid client connect race condition where two threads attempt to connect
         # and one is kicked out of the memoized method before the connection has been
         # established. This rarely happens, but can happen.
-        until ::Protobuf::Nats.client_nats_connection.connected?
+        until ::Protobuf::Nats.client_nats_connection && ::Protobuf::Nats.client_nats_connection.connected?
           logger.warn "Client NATS connection was started but has not connected. Waiting 10ms..."
           sleep 0.01
         end
