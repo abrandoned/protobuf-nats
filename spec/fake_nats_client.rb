@@ -14,6 +14,10 @@ class FakeNatsClient
   def connect(*)
   end
 
+  def connected?
+    true
+  end
+
   def new_inbox
     @inbox
   end

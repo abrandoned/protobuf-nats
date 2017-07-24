@@ -5,14 +5,6 @@ require "monitor"
 module Protobuf
   module Nats
     class Client < ::Protobuf::Rpc::Connectors::Base
-      def initialize(options)
-        # may need to override to setup connection at this stage ... may also do on load of class
-        super
-
-        # This will ensure the client is started.
-        ::Protobuf::Nats.start_client_nats_connection
-      end
-
       def close_connection
         # no-op (I think for now), the connection to server is persistent
       end
@@ -102,6 +94,20 @@ module Protobuf
 
         retry if (retries -= 1) > 0
         raise
+      end
+
+      def setup_connection
+        super
+        # This will ensure the client is started.
+        ::Protobuf::Nats.start_client_nats_connection
+
+        # Avoid client connect race condition where two threads attempt to connect
+        # and one is kicked out of the memoized method before the connection has been
+        # established. This rarely happens, but can happen.
+        until ::Protobuf::Nats.client_nats_connection && ::Protobuf::Nats.client_nats_connection.connected?
+          logger.warn "Client NATS connection was started but has not connected. Waiting 10ms..."
+          sleep 0.01
+        end
       end
 
       def cached_subscription_key
