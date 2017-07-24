@@ -68,6 +68,10 @@ module Protobuf
         @connection
       end
 
+      def connected?
+        !@connection.nil?
+      end
+
       # Do not depend on #close for a greaceful disconnect.
       def close
         @connection.close

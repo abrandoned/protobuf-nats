@@ -97,9 +97,17 @@ module Protobuf
       end
 
       def setup_connection
+        super
         # This will ensure the client is started.
         ::Protobuf::Nats.start_client_nats_connection
-        super
+
+        # Avoid client connect race condition where two threads attempt to connect
+        # and one is kicked out of the memoized method before the connection has been
+        # established. This rarely happens, but can happen.
+        until ::Protobuf::Nats.client_nats_connection.connected?
+          logger.warn "Client NATS connection was started but has not connected. Waiting 10ms..."
+          sleep 0.01
+        end
       end
 
       def cached_subscription_key
