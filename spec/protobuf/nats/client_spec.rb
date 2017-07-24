@@ -189,7 +189,7 @@ describe ::Protobuf::Nats::Client do
     it "starts a NATS connection" do
       client = ::FakeNackClient.new
       expect(::Protobuf::Nats).to receive(:start_client_nats_connection)
-      expect(::Protobuf::Nats).to receive(:client_nats_connection).and_return(client)
+      allow(::Protobuf::Nats).to receive(:client_nats_connection).and_return(client)
       expect(subject).to receive(:request_bytes).and_return("")
       expect(subject).to receive(:parse_response).and_return("")
       expect(subject).to receive(:nats_request_with_two_responses)
@@ -201,11 +201,11 @@ describe ::Protobuf::Nats::Client do
       expect(client).to receive(:connected?).and_return(false, false, true)
 
       expect(::Protobuf::Nats).to receive(:start_client_nats_connection)
+      allow(::Protobuf::Nats).to receive(:client_nats_connection).and_return(client)
+
       expect(subject).to receive(:request_bytes).and_return("")
       expect(subject).to receive(:parse_response).and_return("")
       expect(subject).to receive(:nats_request_with_two_responses)
-
-      expect(::Protobuf::Nats).to receive(:client_nats_connection).and_return(client).exactly(3).times
       expect(subject.logger).to receive(:warn).with("Client NATS connection was started but has not connected. Waiting 10ms...").exactly(2).times
       subject.send_request
     end
