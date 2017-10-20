@@ -187,7 +187,7 @@ describe ::Protobuf::Nats::Server do
       subject.enqueue_request("", "YOLO123")
       sleep 0.1 until subject.thread_pool.size.zero?
 
-      expect(execution_delay).to be > 0
+      expect(execution_delay).to_not eq(nil)
       ::ActiveSupport::Notifications.unsubscribe(subscription)
     end
 
@@ -204,7 +204,7 @@ describe ::Protobuf::Nats::Server do
       subject.enqueue_request("", "YOLO123")
       sleep 0.1 until subject.thread_pool.size.zero?
 
-      expect(request_duration).to be > 0.05
+      expect(request_duration).to be >= 0.05
       ::ActiveSupport::Notifications.unsubscribe(subscription)
     end
 
