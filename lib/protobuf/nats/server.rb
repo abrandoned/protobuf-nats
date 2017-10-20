@@ -1,3 +1,4 @@
+require "active_support"
 require "active_support/core_ext/class/subclasses"
 require "protobuf/rpc/server"
 require "protobuf/rpc/service"
@@ -43,14 +44,27 @@ module Protobuf
       end
 
       def enqueue_request(request_data, reply_id)
+        ::ActiveSupport::Notifications.instrument "server.message_received.protobuf-nats"
+
+        enqueued_at = ::Time.now
         was_enqueued = thread_pool.push do
           begin
+            # Instrument the thread pool time-to-execute duration.
+            processed_at = ::Time.now
+            ::ActiveSupport::Notifications.instrument("server.thread_pool_execution_delay.protobuf-nats",
+                                                      (processed_at - enqueued_at))
+
             # Process request.
             response_data = handle_request(request_data, 'server' => @server)
             # Publish response.
             nats.publish(reply_id, response_data)
           rescue => error
             ::Protobuf::Nats.notify_error_callbacks(error)
+          ensure
+            # Instrument the request duration.
+            completed_at = ::Time.now
+            ::ActiveSupport::Notifications.instrument("server.request_duration.protobuf-nats",
+                                                      (completed_at - enqueued_at))
           end
         end
 
@@ -58,6 +72,8 @@ module Protobuf
         if was_enqueued
           nats.publish(reply_id, ::Protobuf::Nats::Messages::ACK)
         else
+          ::ActiveSupport::Notifications.instrument "server.message_dropped.protobuf-nats"
+
           nats.publish(reply_id, ::Protobuf::Nats::Messages::NACK)
         end
 

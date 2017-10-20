@@ -183,5 +183,42 @@ describe ::Protobuf::Nats::Client do
       expect(subject).to receive(:reconnect_delay).and_return(0.01).exactly(3).times
       expect { subject.send_request }.to raise_error(error)
     end
+
+    context "instrumentation" do
+      it "instruments when a request times out" do
+        allow(subject).to receive(:setup_connection)
+        allow(subject).to receive(:nats_request_with_two_responses).and_return(:ack_timeout)
+        event_triggered = false
+        subscription = ::ActiveSupport::Notifications.subscribe("client.request_timeout.protobuf-nats") do
+          event_triggered = true
+        end
+        subject.send_request rescue nil
+        expect(event_triggered).to eq(true)
+        ::ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+
+      it "instruments when a request is nacked" do
+        allow(subject).to receive(:setup_connection)
+        allow(subject).to receive(:nats_request_with_two_responses).and_return(:nack)
+        event_triggered = false
+        subscription = ::ActiveSupport::Notifications.subscribe("client.request_nack.protobuf-nats") do
+          event_triggered = true
+        end
+        subject.send_request rescue nil
+        expect(event_triggered).to eq(true)
+        ::ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+
+      it "instruments the request duration" do
+        allow(subject).to receive(:send_request_through_nats)
+        event_triggered = false
+        subscription = ::ActiveSupport::Notifications.subscribe("client.request_duration.protobuf-nats") do
+          event_triggered = true
+        end
+        subject.send_request
+        expect(event_triggered).to eq(true)
+        ::ActiveSupport::Notifications.unsubscribe(subscription)
+      end
+    end
   end
 end

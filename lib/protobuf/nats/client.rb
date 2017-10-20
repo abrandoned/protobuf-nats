@@ -70,6 +70,12 @@ module Protobuf
       end
 
       def send_request
+        ::ActiveSupport::Notifications.instrument "client.request_duration.protobuf-nats" do
+          send_request_through_nats
+        end
+      end
+
+      def send_request_through_nats
         retries ||= 3
         nack_retry ||= 0
 
@@ -79,9 +85,11 @@ module Protobuf
           @response_data = nats_request_with_two_responses(cached_subscription_key, @request_data, request_options)
           case @response_data
           when :ack_timeout
+            ::ActiveSupport::Notifications.instrument "client.request_timeout.protobuf-nats"
             next if (retries -= 1) > 0
             raise ::Protobuf::Nats::Errors::RequestTimeout
           when :nack
+            ::ActiveSupport::Notifications.instrument "client.request_nack.protobuf-nats"
             interval = nack_backoff_intervals[nack_retry]
             nack_retry += 1
             raise ::Protobuf::Nats::Errors::RequestTimeout if interval.nil?

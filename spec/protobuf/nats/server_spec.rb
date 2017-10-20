@@ -175,4 +175,65 @@ describe ::Protobuf::Nats::Server do
       sleep 0.1 until subject.thread_pool.size.zero?
     end
   end
+
+  describe "instrumentation" do
+    it "instruments the thread pool execution delay" do
+      expect(subject).to receive(:handle_request).and_return("response")
+      execution_delay = nil
+      subscription = ::ActiveSupport::Notifications.subscribe "server.thread_pool_execution_delay.protobuf-nats" do |_, _, _, _, delay|
+        execution_delay = delay
+      end
+
+      subject.enqueue_request("", "YOLO123")
+      sleep 0.1 until subject.thread_pool.size.zero?
+
+      expect(execution_delay).to_not eq(nil)
+      ::ActiveSupport::Notifications.unsubscribe(subscription)
+    end
+
+    it "instrument a request duration" do
+      expect(subject).to receive(:handle_request) do
+        sleep 0.05
+        "response"
+      end
+      request_duration = nil
+      subscription = ::ActiveSupport::Notifications.subscribe "server.request_duration.protobuf-nats" do |_, _, _, _, duration|
+        request_duration = duration
+      end
+
+      subject.enqueue_request("", "YOLO123")
+      sleep 0.1 until subject.thread_pool.size.zero?
+
+      expect(request_duration).to be >= 0.05
+      ::ActiveSupport::Notifications.unsubscribe(subscription)
+    end
+
+    it "instruments when a message received" do
+      allow(subject.thread_pool).to receive(:push)
+      message_was_received = false
+      subscription = ::ActiveSupport::Notifications.subscribe "server.message_received.protobuf-nats" do
+        message_was_received = true
+      end
+
+      subject.enqueue_request("", "YOLO123")
+      sleep 0.1 until subject.thread_pool.size.zero?
+
+      expect(message_was_received).to eq(true)
+      ::ActiveSupport::Notifications.unsubscribe(subscription)
+    end
+
+    it "instruments when a message dropped" do
+      allow(subject.thread_pool).to receive(:push).and_return(false)
+      message_was_dropped = false
+      subscription = ::ActiveSupport::Notifications.subscribe "server.message_dropped.protobuf-nats" do
+        message_was_dropped = true
+      end
+
+      subject.enqueue_request("", "YOLO123")
+      sleep 0.1 until subject.thread_pool.size.zero?
+
+      expect(message_was_dropped).to eq(true)
+      ::ActiveSupport::Notifications.unsubscribe(subscription)
+    end
+  end
 end
