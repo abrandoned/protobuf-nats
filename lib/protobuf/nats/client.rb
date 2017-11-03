@@ -1,3 +1,4 @@
+require "connection_pool"
 require "protobuf/nats"
 require "protobuf/rpc/connectors/base"
 require "monitor"
@@ -5,12 +6,57 @@ require "monitor"
 module Protobuf
   module Nats
     class Client < ::Protobuf::Rpc::Connectors::Base
+      # Structure to hold subscription and inbox to use within pool
+      SubscriptionInbox = ::Struct.new(:subscription, :inbox)
+
+      def self.subscription_pool
+        @subscription_pool ||= ::ConnectionPool.new(:size => subscription_pool_size, :timeout => 0.1) do
+          inbox = ::Protobuf::Nats.client_nats_connection.new_inbox
+
+          SubscriptionInbox.new(::Protobuf::Nats.client_nats_connection.subscribe(inbox), inbox)
+        end
+      end
+
+      def self.subscription_pool_size
+        @subscription_pool_size ||= if ::ENV.key?("PB_NATS_CLIENT_SUBSCRIPTION_POOL_SIZE")
+          ::ENV["PB_NATS_CLIENT_SUBSCRIPTION_POOL_SIZE"].to_i
+        else
+          0
+        end
+      end
+
       def initialize(options)
         # may need to override to setup connection at this stage ... may also do on load of class
         super
 
         # This will ensure the client is started.
         ::Protobuf::Nats.start_client_nats_connection
+      end
+
+      def new_subscription_inbox
+        nats = ::Protobuf::Nats.client_nats_connection
+        inbox = nats.new_inbox
+        sub = if use_subscription_pooling?
+                nats.subscribe(inbox)
+              else
+                nats.subscribe(inbox, :max => 2)
+              end
+
+        SubscriptionInbox.new(sub, inbox)
+      end
+
+      def with_subscription
+        return_value = nil
+
+        if use_subscription_pooling?
+          self.class.subscription_pool.with do |sub_inbox|
+            return_value = yield sub_inbox
+          end
+        else
+         return_value = yield new_subscription_inbox
+        end
+
+        return_value
       end
 
       def close_connection
@@ -69,7 +115,17 @@ module Protobuf
         end
       end
 
+      def use_subscription_pooling?
+        return @use_subscription_pooling unless @use_subscription_pooling.nil?
+        @use_subscription_pooling = self.class.subscription_pool_size > 0
+      end
+
       def send_request
+        if use_subscription_pooling?
+          available = self.class.subscription_pool.instance_variable_get("@available")
+          ::ActiveSupport::Notifications.instrument "client.pool_availble_size.protobuf-nats", available.length
+        end
+
         ::ActiveSupport::Notifications.instrument "client.request_duration.protobuf-nats" do
           send_request_through_nats
         end
@@ -96,11 +152,11 @@ module Protobuf
             sleep((interval + nack_backoff_splay)/1000.0)
             next
           end
+
           break
         end
 
         parse_response
-
       rescue ::Protobuf::Nats::Errors::IOException => error
         ::Protobuf::Nats.log_error(error)
 
@@ -137,34 +193,40 @@ module Protobuf
           timeout = opts[:timeout] || 60
 
           nats = ::Protobuf::Nats.client_nats_connection
-          inbox = nats.new_inbox
 
           # Publish to server
-          sub = nats.subscribe(inbox, :max => 2)
-          nats.publish(subject, data, inbox)
+          with_subscription do |sub_inbox|
+            nats.publish(subject, data, sub_inbox.inbox)
 
-          # Wait for reply
-          first_message = nats.next_message(sub, ack_timeout)
-          return :ack_timeout if first_message.nil?
-          first_message_data = first_message.data
-          return :nack if first_message_data == ::Protobuf::Nats::Messages::NACK
+            # Wait for reply
+            first_message = nats.next_message(sub_inbox.subscription, ack_timeout)
 
-          second_message = nats.next_message(sub, timeout)
-          second_message_data = second_message.nil? ? nil : second_message.data
+            if first_message.nil?
+              nats.unsubscribe(sub_inbox.subscription)
+              sub_inbox = new_subscription_inbox
+              return :ack_timeout
+            end
 
-          # Check messages
-          response = case ::Protobuf::Nats::Messages::ACK
-                     when first_message_data then second_message_data
-                     when second_message_data then first_message_data
-                     else return :ack_timeout
-                     end
+            first_message_data = first_message.data
+            return :nack if first_message_data == ::Protobuf::Nats::Messages::NACK
 
-          fail(::Protobuf::Nats::Errors::ResponseTimeout, subject) unless response
+            second_message = nats.next_message(sub_inbox.subscription, timeout)
+            second_message_data = second_message.nil? ? nil : second_message.data
 
-          response
-        ensure
-          # Ensure we don't leave a subscriptiosn sitting around.
-          nats.unsubscribe(sub)
+            # Check messages
+            response = case ::Protobuf::Nats::Messages::ACK
+                       when first_message_data then second_message_data
+                       when second_message_data then first_message_data
+                       else
+                         nats.unsubscribe(sub_inbox.subscription)
+                         sub_inbox = new_subscription_inbox
+                         return :ack_timeout
+                       end
+
+            fail(::Protobuf::Nats::Errors::ResponseTimeout, subject) unless response
+
+            response
+          end
         end
 
       else
