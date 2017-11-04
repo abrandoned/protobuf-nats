@@ -7,7 +7,12 @@ module Protobuf
   module Nats
     class Client < ::Protobuf::Rpc::Connectors::Base
       # Structure to hold subscription and inbox to use within pool
-      SubscriptionInbox = ::Struct.new(:subscription, :inbox)
+      SubscriptionInbox = ::Struct.new(:subscription, :inbox) do
+        def swap(sub_inbox)
+          self.subscription = sub_inbox.subscription
+          self.inbox = sub_inbox.inbox
+        end
+      end
 
       def self.subscription_pool
         @subscription_pool ||= ::ConnectionPool.new(:size => subscription_pool_size, :timeout => 0.1) do
@@ -203,7 +208,7 @@ module Protobuf
 
             if first_message.nil?
               nats.unsubscribe(sub_inbox.subscription)
-              sub_inbox = new_subscription_inbox # this line replaces the sub_inbox in the connection pool if necessary
+              sub_inbox.swap(new_subscription_inbox) # this line replaces the sub_inbox in the connection pool if necessary
               return :ack_timeout
             end
 
@@ -219,7 +224,7 @@ module Protobuf
                        when second_message_data then first_message_data
                        else
                          nats.unsubscribe(sub_inbox.subscription)
-                         sub_inbox = new_subscription_inbox
+                         sub_inbox.swap(new_subscription_inbox)
                          return :ack_timeout
                        end
 
