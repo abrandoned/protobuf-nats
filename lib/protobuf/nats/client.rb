@@ -203,7 +203,7 @@ module Protobuf
 
             if first_message.nil?
               nats.unsubscribe(sub_inbox.subscription)
-              sub_inbox = new_subscription_inbox
+              sub_inbox = new_subscription_inbox # this line replaces the sub_inbox in the connection pool if necessary
               return :ack_timeout
             end
 
