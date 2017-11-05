@@ -128,7 +128,7 @@ module Protobuf
       def send_request
         if use_subscription_pooling?
           available = self.class.subscription_pool.instance_variable_get("@available")
-          ::ActiveSupport::Notifications.instrument "client.pool_availble_size.protobuf-nats", available.length
+          ::ActiveSupport::Notifications.instrument "client.pool_available_size.protobuf-nats", available.length
         end
 
         ::ActiveSupport::Notifications.instrument "client.request_duration.protobuf-nats" do
