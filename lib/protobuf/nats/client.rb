@@ -201,36 +201,37 @@ module Protobuf
 
           # Publish to server
           with_subscription do |sub_inbox|
-            nats.publish(subject, data, sub_inbox.inbox)
+            begin
+              completed_request = false
+              nats.publish(subject, data, sub_inbox.inbox)
 
-            # Wait for reply
-            first_message = nats.next_message(sub_inbox.subscription, ack_timeout)
+              # Wait for reply
+              first_message = nats.next_message(sub_inbox.subscription, ack_timeout)
+              return :ack_timeout if first_message.nil?
 
-            if first_message.nil?
-              nats.unsubscribe(sub_inbox.subscription)
-              sub_inbox.swap(new_subscription_inbox) # this line replaces the sub_inbox in the connection pool if necessary
-              return :ack_timeout
+              first_message_data = first_message.data
+              return :nack if first_message_data == ::Protobuf::Nats::Messages::NACK
+
+              second_message = nats.next_message(sub_inbox.subscription, timeout)
+              second_message_data = second_message.nil? ? nil : second_message.data
+
+              # Check messages
+              response = case ::Protobuf::Nats::Messages::ACK
+                         when first_message_data then second_message_data
+                         when second_message_data then first_message_data
+                         else return :ack_timeout
+                         end
+
+              fail(::Protobuf::Nats::Errors::ResponseTimeout, subject) unless response
+
+              completed_request = true
+              response
+            ensure
+              if !completed_request
+                nats.unsubscribe(sub_inbox.subscription)
+                sub_inbox.swap(new_subscription_inbox) # this line replaces the sub_inbox in the connection pool if necessary
+              end
             end
-
-            first_message_data = first_message.data
-            return :nack if first_message_data == ::Protobuf::Nats::Messages::NACK
-
-            second_message = nats.next_message(sub_inbox.subscription, timeout)
-            second_message_data = second_message.nil? ? nil : second_message.data
-
-            # Check messages
-            response = case ::Protobuf::Nats::Messages::ACK
-                       when first_message_data then second_message_data
-                       when second_message_data then first_message_data
-                       else
-                         nats.unsubscribe(sub_inbox.subscription)
-                         sub_inbox.swap(new_subscription_inbox)
-                         return :ack_timeout
-                       end
-
-            fail(::Protobuf::Nats::Errors::ResponseTimeout, subject) unless response
-
-            response
           end
         end
 
