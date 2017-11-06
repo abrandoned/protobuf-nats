@@ -58,7 +58,7 @@ module Protobuf
             return_value = yield sub_inbox
           end
         else
-         return_value = yield new_subscription_inbox
+          return_value = yield new_subscription_inbox
         end
 
         return_value
