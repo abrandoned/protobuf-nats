@@ -128,7 +128,7 @@ module Protobuf
       def send_request
         if use_subscription_pooling?
           available = self.class.subscription_pool.instance_variable_get("@available")
-          ::ActiveSupport::Notifications.instrument "client.pool_available_size.protobuf-nats", available.length
+          ::ActiveSupport::Notifications.instrument "client.subscription_pool_available_size.protobuf-nats", available.length
         end
 
         ::ActiveSupport::Notifications.instrument "client.request_duration.protobuf-nats" do
@@ -203,6 +203,12 @@ module Protobuf
           with_subscription do |sub_inbox|
             begin
               completed_request = false
+
+              if !sub_inbox.subscription.is_valid # replace the subscription if is has been pooled but is no longer valid (maybe a reconnect)
+                nats.unsubscribe(sub_inbox.subscription)
+                sub_inbox.swap(new_subscription_inbox) # this line replaces the sub_inbox in the connection pool if necessary
+              end
+
               nats.publish(subject, data, sub_inbox.inbox)
 
               # Wait for reply
