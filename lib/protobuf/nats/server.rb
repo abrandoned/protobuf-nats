@@ -80,6 +80,24 @@ module Protobuf
         was_enqueued
       end
 
+      def do_not_subscribe_to_includes?(subscription_key)
+        return false unless ::Protobuf::Nats.config.server_subscription_key_do_not_subscribe_to_when_includes_any_of.respond_to?(:any?)
+        return false if ::Protobuf::Nats.config.server_subscription_key_do_not_subscribe_to_when_includes_any_of.empty?
+
+        ::Protobuf::Nats.config.server_subscription_key_do_not_subscribe_to_when_includes_any_of.any? do |key|
+          subscription_key.include?(key)
+        end
+      end
+
+      def only_subscribe_to_includes?(subscription_key)
+        return true unless ::Protobuf::Nats.config.server_subscription_key_only_subscribe_to_when_includes_any_of.respond_to?(:any?)
+        return true if ::Protobuf::Nats.config.server_subscription_key_only_subscribe_to_when_includes_any_of.empty?
+
+        ::Protobuf::Nats.config.server_subscription_key_only_subscribe_to_when_includes_any_of.any? do |key|
+          subscription_key.include?(key)
+        end
+      end
+
       def pause_file_path
         ::ENV.fetch("PB_NATS_SERVER_PAUSE_FILE_PATH", nil)
       end
@@ -108,9 +126,12 @@ module Protobuf
         service_klasses.each do |service_klass|
           service_klass.rpcs.each do |service_method, _|
             # Skip services that are not implemented.
-            next unless service_klass.method_defined? service_method
+            next unless service_klass.method_defined?(service_method)
+            subscription_key = ::Protobuf::Nats.subscription_key(service_klass, service_method)
+            next if do_not_subscribe_to_includes?(subscription_key)
+            next unless only_subscribe_to_includes?(subscription_key)
 
-            yield ::Protobuf::Nats.subscription_key(service_klass, service_method)
+            yield subscription_key
           end
         end
       end

@@ -76,6 +76,12 @@ An example config looks like this:
     tls_client_key: "/path/to/client-key.pem"
     tls_ca_cert: "/path/to/ca.pem"
     connect_timeout: 2
+    server_subscription_key_only_subscribe_to_when_includes_any_of:
+      - "search"
+      - "create"
+    server_subscription_key_do_not_subscribe_to_when_includes_any_of:
+      - "old_search"
+      - "old_create"
     subscription_key_replacements:
       - "original_service": "replacement_service"
 ```
