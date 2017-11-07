@@ -81,9 +81,8 @@ module Protobuf
       end
 
       def do_not_subscribe_to_includes?(subscription_key)
-        return false if ::Protobuf::Nats.config.server_subscription_key_do_not_subscribe_to_when_includes_any_of.nil?
-        return false if ::Protobuf::Nats.config.server_subscription_key_do_not_subscribe_to_when_includes_any_of.empty?
         return false unless ::Protobuf::Nats.config.server_subscription_key_do_not_subscribe_to_when_includes_any_of.respond_to?(:any?)
+        return false if ::Protobuf::Nats.config.server_subscription_key_do_not_subscribe_to_when_includes_any_of.empty?
 
         ::Protobuf::Nats.config.server_subscription_key_do_not_subscribe_to_when_includes_any_of.any? do |key|
           subscription_key.include?(key)
@@ -91,9 +90,8 @@ module Protobuf
       end
 
       def only_subscribe_to_includes?(subscription_key)
-        return true if ::Protobuf::Nats.config.server_subscription_key_only_subscribe_to_when_includes_any_of.nil?
-        return true if ::Protobuf::Nats.config.server_subscription_key_only_subscribe_to_when_includes_any_of.empty?
         return true unless ::Protobuf::Nats.config.server_subscription_key_only_subscribe_to_when_includes_any_of.respond_to?(:any?)
+        return true if ::Protobuf::Nats.config.server_subscription_key_only_subscribe_to_when_includes_any_of.empty?
 
         ::Protobuf::Nats.config.server_subscription_key_only_subscribe_to_when_includes_any_of.any? do |key|
           subscription_key.include?(key)
