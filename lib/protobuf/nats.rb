@@ -86,32 +86,33 @@ module Protobuf
           # Disable publisher pending buffer on reconnect
           options = config.connection_options.merge(:disable_reconnect_buffer => true)
 
+          client = NatsClient.new
           begin
-            @client_nats_connection = NatsClient.new
-            @client_nats_connection.connect(options)
+            client.connect(options)
           rescue ::Protobuf::Nats::Errors::IOException
-            @client_nats_connection = nil
             raise
           end
 
           # Ensure we have a valid connection to the NATS server.
-          @client_nats_connection.flush(5)
+          client.flush(5)
 
-          @client_nats_connection.on_disconnect do
+          client.on_disconnect do
             logger.warn("Client NATS connection was disconnected")
           end
 
-          @client_nats_connection.on_reconnect do
+          client.on_reconnect do
             logger.warn("Client NATS connection was reconnected")
           end
 
-          @client_nats_connection.on_close do
+          client.on_close do
             logger.warn("Client NATS connection was closed")
           end
 
-          @client_nats_connection.on_error do |error|
+          client.on_error do |error|
             notify_error_callbacks(error)
           end
+
+          @client_nats_connection = client
 
           true
         end
