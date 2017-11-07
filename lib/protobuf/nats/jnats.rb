@@ -87,7 +87,7 @@ module Protobuf
       end
 
       def flush(timeout_sec = 0.5)
-       connection.flush(timeout_sec * 1000)
+        connection.flush(timeout_sec * 1000)
       end
 
       def next_message(sub, timeout_sec)
