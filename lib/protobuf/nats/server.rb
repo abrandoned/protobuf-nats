@@ -86,7 +86,7 @@ module Protobuf
         return false unless ::Protobuf::Nats.config.server_subscription_key_do_not_subscribe_to_when_includes_any_of.respond_to?(:any?)
 
         ::Protobuf::Nats.config.server_subscription_key_do_not_subscribe_to_when_includes_any_of.any? do |key|
-          subscription_key.includes?(key)
+          subscription_key.include?(key)
         end
       end
 
