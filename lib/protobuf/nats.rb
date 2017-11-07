@@ -88,11 +88,7 @@ module Protobuf
         options = config.connection_options.merge(:disable_reconnect_buffer => true)
 
         client = NatsClient.new
-        begin
-          client.connect(options)
-        rescue ::Protobuf::Nats::Errors::IOException
-          raise
-        end
+        client.connect(options)
 
         # Ensure we have a valid connection to the NATS server.
         client.flush(5)
