@@ -126,6 +126,9 @@ module Protobuf
       end
 
       def send_request
+        # This will ensure the client is started.
+        ::Protobuf::Nats.start_client_nats_connection
+
         if use_subscription_pooling?
           available = self.class.subscription_pool.instance_variable_get("@available")
           ::ActiveSupport::Notifications.instrument "client.subscription_pool_available_size.protobuf-nats", available.length
