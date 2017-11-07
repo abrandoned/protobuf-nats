@@ -11,6 +11,12 @@
     tls_client_key: "./spec/support/certs/client-key.pem"
     tls_ca_cert: "./spec/support/certs/ca.pem"
     connect_timeout: 2
+    server_subscription_key_only_subscribe_to_when_includes_any_of:
+      - "search"
+      - "derp"
+    server_subscription_key_do_not_subscribe_to_when_includes_any_of:
+      - "derpderp"
+      - "searchsearch"
     subscription_key_replacements:
       - "original_": "local_"
       - "another_subscription": "different_subscription"

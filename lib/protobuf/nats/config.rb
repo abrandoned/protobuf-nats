@@ -4,7 +4,10 @@ require "yaml"
 module Protobuf
   module Nats
     class Config
-      attr_accessor :uses_tls, :servers, :connect_timeout, :tls_client_cert, :tls_client_key, :tls_ca_cert, :max_reconnect_attempts, :subscription_key_replacements
+      attr_accessor :uses_tls, :servers, :connect_timeout, :tls_client_cert, :tls_client_key, :tls_ca_cert, :max_reconnect_attempts
+      attr_accessor :server_subscription_key_do_not_subscribe_to_when_includes_any_of,
+                    :server_subscription_key_only_subscribe_to_when_includes_any_of,
+                    :subscription_key_replacements
 
       CONFIG_MUTEX = ::Mutex.new
 
@@ -16,6 +19,8 @@ module Protobuf
         :tls_client_key => nil,
         :tls_ca_cert => nil,
         :uses_tls => false,
+        :server_subscription_key_do_not_subscribe_to_when_includes_any_of => [],
+        :server_subscription_key_only_subscribe_to_when_includes_any_of => [],
         :subscription_key_replacements => [],
       }.freeze
 
@@ -62,6 +67,8 @@ module Protobuf
             tls_client_key: tls_client_key,
             tls_ca_cert: tls_ca_cert,
             connect_timeout: connect_timeout,
+            server_subscription_key_do_not_subscribe_to_when_includes_any_of: server_subscription_key_do_not_subscribe_to_when_includes_any_of,
+            server_subscription_key_only_subscribe_to_when_includes_any_of: server_subscription_key_only_subscribe_to_when_includes_any_of,
             subscription_key_replacements: subscription_key_replacements,
           }
           options[:tls] = {:context => new_tls_context} if uses_tls
