@@ -73,6 +73,8 @@ module Protobuf
 
       def connection
         return @connection unless @connection.nil?
+        # Ensure no consumer or supervisor are running
+        close
         connect(options || {})
       end
 
