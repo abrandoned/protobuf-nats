@@ -78,11 +78,10 @@ module Protobuf
     end
 
     def self.start_client_nats_connection
-      return true if @start_client_nats_connection && @client_nats_connection
+      return true if @client_nats_connection
 
       GET_CONNECTED_MUTEX.synchronize do
         break true if @client_nats_connection
-        break true if @start_client_nats_connection
 
         # Disable publisher pending buffer on reconnect
         options = config.connection_options.merge(:disable_reconnect_buffer => true)
