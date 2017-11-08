@@ -13,7 +13,7 @@ end
 module Protobuf
   module Nats
     class JNats
-      attr_reader :connection
+      attr_reader :connection, :options
 
       class Message
         attr_reader :data, :subject, :reply
@@ -30,11 +30,14 @@ module Protobuf
         @on_reconnect_cb = lambda {}
         @on_disconnect_cb = lambda {}
         @on_close_cb = lambda {}
+        @options = nil
         @subz_cbs = {}
         @subz_mutex = ::Mutex.new
       end
 
       def connect(options = {})
+        @options ||= options
+
         servers = options[:servers] || ["nats://localhost:4222"]
         servers = [servers].flatten.map { |uri_string| java.net.URI.new(uri_string) }
         connection_factory = ::Java::IoNatsClient::ConnectionFactory.new
@@ -68,9 +71,16 @@ module Protobuf
         @connection
       end
 
-      # Do not depend on #close for a greaceful disconnect.
+      def connection
+        return @connection unless @connection.nil?
+        # Ensure no consumer or supervisor are running
+        close
+        connect(options || {})
+      end
+
+      # Do not depend on #close for a graceful disconnect.
       def close
-        @connection.close
+        @connection.close rescue nil
         @connection = nil
         @supervisor.kill rescue nil
         @supervisor = nil
@@ -79,7 +89,7 @@ module Protobuf
       end
 
       def flush(timeout_sec = 0.5)
-        @connection.flush(timeout_sec * 1000)
+        connection.flush(timeout_sec * 1000)
       end
 
       def next_message(sub, timeout_sec)
@@ -90,7 +100,7 @@ module Protobuf
 
       def publish(subject, data, mailbox = nil)
         # The "true" here is to force flush. May not need this.
-        @connection.publish(subject, mailbox, data.to_java_bytes, true)
+        connection.publish(subject, mailbox, data.to_java_bytes, true)
       end
 
       def subscribe(subject, options = {}, &block)
@@ -100,8 +110,8 @@ module Protobuf
         # We pass our work queue for processing async work because java nats
         # uses a cahced thread pool: 1 thread per async subscription.
         # Sync subs need their own queue so work is not processed async.
-        work_queue = block.nil? ? @connection.createMsgChannel : @work_queue
-        sub = @connection.subscribe(subject, queue, nil, work_queue)
+        work_queue = block.nil? ? connection.createMsgChannel : @work_queue
+        sub = connection.subscribe(subject, queue, nil, work_queue)
 
         # Register the block callback. We only lock to save the callback.
         if block

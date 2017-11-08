@@ -16,6 +16,8 @@ describe ::Protobuf::Nats::Config do
       :tls_client_key => nil,
       :uses_tls => false,
       :max_reconnect_attempts => 60_000,
+      :server_subscription_key_do_not_subscribe_to_when_includes_any_of => [],
+      :server_subscription_key_only_subscribe_to_when_includes_any_of => [],
       :subscription_key_replacements => [],
     }
     expect(subject.connection_options).to eq(expected_options)
@@ -57,6 +59,8 @@ describe ::Protobuf::Nats::Config do
     expect(subject.connect_timeout).to eq(2)
     expect(subject.max_reconnect_attempts).to eq(1234)
     expect(subject.subscription_key_replacements).to eq([{"original_" => "local_"}, {"another_subscription" => "different_subscription"}])
+    expect(subject.server_subscription_key_only_subscribe_to_when_includes_any_of).to eq(["search", "derp"])
+    expect(subject.server_subscription_key_do_not_subscribe_to_when_includes_any_of).to eq(["derpderp", "searchsearch"])
 
     ENV["PROTOBUF_NATS_CONFIG_PATH"] = nil
   end

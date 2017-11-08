@@ -4,8 +4,10 @@ describe ::Protobuf::Nats::Server do
   class SomeRandom < ::Protobuf::Message; end
   class SomeRandomService < ::Protobuf::Rpc::Service
     rpc :implemented, SomeRandom, SomeRandom
+    rpc :implemented_again, SomeRandom, SomeRandom
     rpc :not_implemented, SomeRandom, SomeRandom
     def implemented; end
+    def implemented_again; end
   end
 
   let(:logger) { ::Logger.new(nil) }
@@ -125,9 +127,81 @@ describe ::Protobuf::Nats::Server do
   end
 
   describe "#subscribe_to_services_once" do
+    context "do not subscribe to when includes any of" do
+      it "subscribes to services when they are not present" do
+        config = ::Protobuf::Nats.config
+
+        subject.subscribe_to_services_once
+        expect(client.subscriptions.keys).to eq(["rpc.some_random_service.implemented", "rpc.some_random_service.implemented_again"])
+      end
+
+      it "does not subscribe when an included substring is present for an implemented service" do
+        config = ::Protobuf::Nats.config
+        config.server_subscription_key_do_not_subscribe_to_when_includes_any_of << "random_service"
+
+        subject.subscribe_to_services_once
+        expect(client.subscriptions.keys).to eq([])
+
+        config.server_subscription_key_do_not_subscribe_to_when_includes_any_of.clear
+      end
+
+      it "does not subscribe when an included substring is present for an implemented service (and in only group)" do
+        config = ::Protobuf::Nats.config
+        config.server_subscription_key_do_not_subscribe_to_when_includes_any_of << "random_service"
+        config.server_subscription_key_only_subscribe_to_when_includes_any_of << "random_service"
+
+        subject.subscribe_to_services_once
+        expect(client.subscriptions.keys).to eq([])
+
+        config.server_subscription_key_do_not_subscribe_to_when_includes_any_of.clear
+        config.server_subscription_key_only_subscribe_to_when_includes_any_of.clear
+      end
+    end
+
+    context "only subscribe to when includes any of" do
+      it "subscribes to services when they are not present" do
+        config = ::Protobuf::Nats.config
+
+        subject.subscribe_to_services_once
+        expect(client.subscriptions.keys).to eq(["rpc.some_random_service.implemented", "rpc.some_random_service.implemented_again"])
+      end
+
+      it "subscribes when an included substring is present for an implemented service and restrains possible" do
+        config = ::Protobuf::Nats.config
+        config.server_subscription_key_only_subscribe_to_when_includes_any_of << "again"
+
+        subject.subscribe_to_services_once
+        expect(client.subscriptions.keys).to eq(["rpc.some_random_service.implemented_again"])
+
+        config.server_subscription_key_only_subscribe_to_when_includes_any_of.clear
+      end
+
+      it "subscribes when an included substring is present for an implemented service" do
+        config = ::Protobuf::Nats.config
+        config.server_subscription_key_only_subscribe_to_when_includes_any_of << "random_service"
+
+        subject.subscribe_to_services_once
+        expect(client.subscriptions.keys).to eq(["rpc.some_random_service.implemented", "rpc.some_random_service.implemented_again"])
+
+        config.server_subscription_key_only_subscribe_to_when_includes_any_of.clear
+      end
+
+      it "does not subscribe when an included substring is present for an implemented service (and in do not group)" do
+        config = ::Protobuf::Nats.config
+        config.server_subscription_key_do_not_subscribe_to_when_includes_any_of << "random_service"
+        config.server_subscription_key_only_subscribe_to_when_includes_any_of << "random_service"
+
+        subject.subscribe_to_services_once
+        expect(client.subscriptions.keys).to eq([])
+
+        config.server_subscription_key_do_not_subscribe_to_when_includes_any_of.clear
+        config.server_subscription_key_only_subscribe_to_when_includes_any_of.clear
+      end
+    end
+
     it "subscribes to services that inherit from protobuf rpc service" do
       subject.subscribe_to_services_once
-      expect(client.subscriptions.keys).to eq(["rpc.some_random_service.implemented"])
+      expect(client.subscriptions.keys).to eq(["rpc.some_random_service.implemented", "rpc.some_random_service.implemented_again"])
     end
   end
 

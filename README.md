@@ -47,6 +47,8 @@ used to allow JVM based servers to warm-up slowly to prevent jolts in runtime pe
 
 `PB_NATS_CLIENT_RECONNECT_DELAY` - If we detect a reconnect delay, we will wait this many seconds (default: the ACK timeout).
 
+`PB_NATS_CLIENT_SUBSCRIPTION_POOL_SIZE` - If subscription pooling is desired for the request/response cycle then the pool size maximum should be set; the pool is lazy and therefore will only start new subscriptions as necessary (default: 0)
+
 `PROTOBUF_NATS_CONFIG_PATH` - Custom path to the config yaml (default: "config/protobuf_nats.yml").
 
 ### YAML Config
@@ -74,6 +76,12 @@ An example config looks like this:
     tls_client_key: "/path/to/client-key.pem"
     tls_ca_cert: "/path/to/ca.pem"
     connect_timeout: 2
+    server_subscription_key_only_subscribe_to_when_includes_any_of:
+      - "search"
+      - "create"
+    server_subscription_key_do_not_subscribe_to_when_includes_any_of:
+      - "old_search"
+      - "old_create"
     subscription_key_replacements:
       - "original_service": "replacement_service"
 ```
