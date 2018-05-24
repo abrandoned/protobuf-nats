@@ -33,7 +33,7 @@ Gem::Specification.new do |spec|
   spec.add_runtime_dependency "activesupport", ">= 3.2"
   spec.add_runtime_dependency "connection_pool"
   spec.add_runtime_dependency "protobuf", "~> 3.7", ">= 3.7.2"
-  spec.add_runtime_dependency "nats-pure"
+  spec.add_runtime_dependency "nats-pure", "~> 0.3", "< 0.4"
 
   spec.add_development_dependency "bundler", "~> 1.14"
   spec.add_development_dependency "rake", "~> 10.0"
