@@ -207,7 +207,7 @@ module Protobuf
             begin
               completed_request = false
 
-              if !sub_inbox.subscription.is_valid # replace the subscription if is has been pooled but is no longer valid (maybe a reconnect)
+              if !sub_inbox.subscription.is_active # replace the subscription if is has been pooled but is no longer valid (maybe a reconnect)
                 nats.unsubscribe(sub_inbox.subscription)
                 sub_inbox.swap(new_subscription_inbox) # this line replaces the sub_inbox in the connection pool if necessary
               end

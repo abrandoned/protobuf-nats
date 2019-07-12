@@ -11,7 +11,7 @@ if defined?(JRUBY_VERSION)
       end
 
       it "attempts to reconnect with options given to #connect" do
-        allow(::Java::IoNatsClient::ConnectionFactory).to receive(:new).and_raise(::RuntimeError)
+        allow(::Java::IoNatsClient::Nats).to receive(:connect).and_raise(::RuntimeError)
         provided_options = {:yolo => "ok"}
         subject.connect(provided_options) rescue nil
         expect(subject.options).to eq(provided_options)

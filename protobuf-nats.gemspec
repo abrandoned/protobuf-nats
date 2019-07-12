@@ -35,7 +35,7 @@ Gem::Specification.new do |spec|
   spec.add_runtime_dependency "protobuf", "~> 3.7", ">= 3.7.2"
   spec.add_runtime_dependency "nats-pure", "~> 0.3", "< 0.4"
 
-  spec.add_development_dependency "bundler", "~> 1.14"
+  spec.add_development_dependency "bundler"
   spec.add_development_dependency "rake", "~> 10.0"
   spec.add_development_dependency "rspec"
   spec.add_development_dependency "benchmark-ips"

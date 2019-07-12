@@ -3,17 +3,84 @@ ext_base = ::File.join(::File.dirname(__FILE__), '..', '..', '..', 'ext')
 require ::File.join(ext_base, "jars/slf4j-api-1.7.25.jar")
 require ::File.join(ext_base, "jars/slf4j-simple-1.7.25.jar")
 require ::File.join(ext_base, "jars/gson-2.6.2.jar")
-require ::File.join(ext_base, "jars/jnats-1.1-SNAPSHOT.jar")
+#require ::File.join(ext_base, "jars/jnats-1.1-SNAPSHOT.jar")
+require ::File.join(ext_base, "jars/jnats-2.5.2-SNAPSHOT.jar")
 
-# Set field accessors so we can access the member variables directly.
-class Java::IoNatsClient::SubscriptionImpl
-  field_accessor :pMsgs, :pBytes, :delivered
-end
+# # Set field accessors so we can access the member variables directly.
+# class Java::IoNatsClient::SubscriptionImpl
+#   field_accessor :pMsgs, :pBytes, :delivered
+# end
 
 module Protobuf
   module Nats
     class JNats
-      attr_reader :connection, :options
+      attr_reader :connection, :subscription_manager, :options
+
+      class MessageHandlerProxy
+        include ::Java::IoNatsClient::MessageHandler
+
+        def initialize(&block)
+          @cb = block
+        end
+
+        def onMessage(message)
+          @cb.call(message.getData.to_s, message.getReplyTo, message.getSubject)
+        end
+      end
+
+      class ConnectionListener
+        include ::Java::IoNatsClient::ConnectionListener
+
+        def initialize
+          @on_reconnect_cb = lambda {}
+          @on_disconnect_cb = lambda {}
+          @on_close_cb = lambda {}
+        end
+
+        def on_close(&block); @on_close_cb = block; end
+        def on_disconnect(&block); @on_disconnect_cb = block; end
+        def on_reconnect(&block); @on_reconnect_cb = block; end
+
+        def connectionEvent(conn, event_type)
+          case event_type
+          when ::Java::IoNatsClient::ConnectionListener::Events::RECONNECTED
+            @on_reconnect_cb.call
+          when ::Java::IoNatsClient::ConnectionListener::Events::DISCONNECTED
+            @on_disconnect_cb.call
+          when ::Java::IoNatsClient::ConnectionListener::Events::CLOSED
+            @on_close_cb.call
+          end
+        end
+      end
+
+      class ErrorListener
+        include ::Java::IoNatsClient::ErrorListener
+
+        def initialize
+          @on_error_cb = lambda { |_error| }
+          @on_exception_cb = lambda { |_exception| }
+          @on_slow_consumer_cb = lambda { |_consumer| }
+        end
+
+        def on_error(&block)
+          return if block.nil? || block.arity != 1
+          @on_error_cb = block
+        end
+
+        def on_exception(&block)
+          return if block.nil? || block.arity != 1
+          @on_exception_cb = block
+        end
+
+        def on_slow_consumer(&block)
+          return if block.nil? || block.arity != 1
+          @on_slow_consumer_cb = block
+        end
+
+        def errorOccurred(_conn, error); @on_error_cb.call(error); end
+        def exceptionOccurred(_conn, exception); @on_exception_cb.call(exception); end
+        def slowConsumerDetected(_conn, consumer); @on_slow_consumer_cb.call(consumer); end
+      end
 
       class Message
         attr_reader :data, :subject, :reply
@@ -26,10 +93,9 @@ module Protobuf
       end
 
       def initialize
-        @on_error_cb = lambda {|error|}
-        @on_reconnect_cb = lambda {}
-        @on_disconnect_cb = lambda {}
-        @on_close_cb = lambda {}
+        @connection_listener = ConnectionListener.new
+        @error_listener = ErrorListener.new
+
         @options = nil
         @subz_cbs = {}
         @subz_mutex = ::Mutex.new
@@ -39,35 +105,26 @@ module Protobuf
         @options ||= options
 
         servers = options[:servers] || ["nats://localhost:4222"]
-        servers = [servers].flatten.map { |uri_string| java.net.URI.new(uri_string) }
-        connection_factory = ::Java::IoNatsClient::ConnectionFactory.new
-        connection_factory.setServers(servers)
-        connection_factory.setMaxReconnect(options[:max_reconnect_attempts])
+        servers = [servers].flatten
+
+        builder = ::Java::IoNatsClient::Options::Builder.new
+        builder.servers(servers)
+        builder.maxReconnects(options[:max_reconnect_attempts])
+        builder.errorListener(@error_listener)
 
         # Shrink the pending buffer to always raise an error and let the caller retry.
         if options[:disable_reconnect_buffer]
-          connection_factory.setReconnectBufSize(1)
+          builder.reconnectBufferSize(1)
         end
-
-        # Setup callbacks
-        connection_factory.setDisconnectedCallback { |event| @on_disconnect_cb.call }
-        connection_factory.setReconnectedCallback { |_event| @on_reconnect_cb.call }
-        connection_factory.setClosedCallback { |_event| @on_close_cb.call }
-        connection_factory.setExceptionHandler { |error| @on_error_cb.call(error) }
 
         # Setup ssl context if we're using tls
         if options[:uses_tls]
           ssl_context = create_ssl_context(options)
-          connection_factory.setSecure(true)
-          connection_factory.setSSLContext(ssl_context)
+          builder.sslContext(ssl_context)
         end
 
-        @connection = connection_factory.createConnection
-
-        # We're going to spawn a consumer and supervisor
-        @work_queue = @connection.createMsgChannel
-        spwan_supervisor_and_consumer
-
+        @connection = ::Java::IoNatsClient::Nats.connect(builder.build)
+        @subscription_manager = @connection.createSubscriptionManager
         @connection
       end
 
@@ -80,64 +137,56 @@ module Protobuf
 
       # Do not depend on #close for a graceful disconnect.
       def close
-        @connection.close rescue nil
+        if @connection
+          @connection.closeSubscriptionManager(@subscription_manager) rescue nil
+          @connection.close rescue nil
+        end
+        @subscription_manager = nil
         @connection = nil
-        @supervisor.kill rescue nil
-        @supervisor = nil
-        @consumer.kill rescue nil
-        @supervisor = nil
       end
 
       def flush(timeout_sec = 0.5)
-        connection.flush(timeout_sec * 1000)
+        duration = duration_in_ms(timeout_sec * 1000)
+        connection.flush(duration)
       end
 
       def next_message(sub, timeout_sec)
-        nats_message = sub.nextMessage(timeout_sec * 1000)
+        duration = duration_in_ms(timeout_sec * 1000)
+        nats_message = sub.nextMessage(duration)
         return nil unless nats_message
         Message.new(nats_message)
       end
 
       def publish(subject, data, mailbox = nil)
         # The "true" here is to force flush. May not need this.
-        connection.publish(subject, mailbox, data.to_java_bytes, true)
+        connection.publish(subject, mailbox, data.to_java_bytes)
+        connection.flush(nil)
       end
 
       def subscribe(subject, options = {}, &block)
         queue = options[:queue]
         max = options[:max]
-        work_queue = nil
-        # We pass our work queue for processing async work because java nats
-        # uses a cahced thread pool: 1 thread per async subscription.
-        # Sync subs need their own queue so work is not processed async.
-        work_queue = block.nil? ? connection.createMsgChannel : @work_queue
-        sub = connection.subscribe(subject, queue, nil, work_queue)
 
-        # Register the block callback. We only lock to save the callback.
         if block
-          @subz_mutex.synchronize do
-            @subz_cbs[sub.getSid] = block
-          end
+          handler = MessageHandlerProxy.new(&block)
+          sub = subscribe_using_subscription_manager(subject, queue, handler)
+          # Auto unsub if max message option was provided.
+          subscription_manager.unsubscribe(sub, max) if max
+          sub
+        else
+          sub = subscribe_using_connection(subject, queue)
+          sub.unsubscribe(max) if max
+          sub
         end
-
-        # Auto unsub if max message option was provided.
-        sub.autoUnsubscribe(max) if max
-
-        sub
       end
 
       def unsubscribe(sub)
         return if sub.nil?
-
-        # Cleanup our async callback
-        if @subz_cbs[sub.getSid]
-          @subz_mutex.synchronize do
-            @subz_cbs.delete(sub.getSid)
-          end
+        if sub.getSubscriptionManager
+          subscription_manager.unsubscribe(sub)
+        else
+          sub.unsubscribe()
         end
-
-        # The "true" here is to ignore and invalid conn.
-        sub.unsubscribe(true)
       end
 
       def new_inbox
@@ -145,66 +194,42 @@ module Protobuf
       end
 
       def on_reconnect(&cb)
-        @on_reconnect_cb = cb
+        @connection_listener.on_reconnect(&cb)
       end
 
       def on_disconnect(&cb)
-        @on_disconnect_cb = cb
+        @connection_listener.on_disconnect(&cb)
       end
 
       def on_error(&cb)
-        @on_error_cb = cb
+        @error_listener.on_exception(&cb)
       end
 
       def on_close(&cb)
-        @on_close_cb = cb
+        @connection_listener.on_close(&cb)
       end
 
     private
 
-      def spwan_supervisor_and_consumer
-        spawn_consumer
-        @supervisor = ::Thread.new do
-          loop do
-            begin
-              sleep 1
-              next if @consumer && @consumer.alive?
-              # We need to recreate the consumer thread
-              @consumer.kill if @consumer
-              spawn_consumer
-            rescue => error
-              @on_error_cb.call(error)
-            end
-          end
+      def duration_in_ms(ms); ::Java::JavaTime::Duration.ofMillis(ms); end
+
+      def subscribe_using_connection(subject, queue)
+        if queue
+          connection.subscribe(subject, queue)
+        else
+          connection.subscribe(subject)
         end
       end
 
-      def spawn_consumer
-        @consumer = ::Thread.new do
-          loop do
-            begin
-              message = @work_queue.take
-              next unless message
-              sub = message.getSubscription
-
-              # We have to update the subscription stats so we're not considered a slow consumer.
-              begin
-                sub.lock
-                sub.pMsgs -= 1
-                sub.pBytes -= message.getData.length if message.getData
-                sub.delivered += 1 unless sub.isClosed
-              ensure
-                sub.unlock
-              end
-
-              # We don't need t
-              callback = @subz_cbs[sub.getSid]
-              next unless callback
-              callback.call(message.getData.to_s, message.getReplyTo, message.getSubject)
-            rescue => error
-              @on_error_cb.call(error)
-            end
-          end
+      def subscribe_using_subscription_manager(subject, queue, handler)
+        if queue
+          subscription_manager.java_send(:subscribe,
+                                         [::Java::JavaLang::String, ::Java::JavaLang::String, ::Java::IoNatsClient::MessageHandler],
+                                         subject, queue, handler)
+        else
+          subscription_manager.java_send(:subscribe,
+                                         [::Java::JavaLang::String, ::Java::IoNatsClient::MessageHandler],
+                                         subject, handler)
         end
       end
 
