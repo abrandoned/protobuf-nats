@@ -14,10 +14,14 @@ require ::File.join(ext_base, "jars/jnats-2.5.2-SNAPSHOT.jar")
 module Protobuf
   module Nats
     class JNats
-      attr_reader :connection, :subscription_manager, :options
+      attr_reader :connection, :dispatcher, :options
 
       class MessageHandlerProxy
         include ::Java::IoNatsClient::MessageHandler
+
+        def self.empty
+          new {}
+        end
 
         def initialize(&block)
           @cb = block
@@ -124,7 +128,7 @@ module Protobuf
         end
 
         @connection = ::Java::IoNatsClient::Nats.connect(builder.build)
-        @subscription_manager = @connection.createSubscriptionManager
+        @dispatcher = @connection.createDispatcher(MessageHandlerProxy.empty)
         @connection
       end
 
@@ -138,10 +142,10 @@ module Protobuf
       # Do not depend on #close for a graceful disconnect.
       def close
         if @connection
-          @connection.closeSubscriptionManager(@subscription_manager) rescue nil
+          @connection.closeDispatcher(@dispatcher) rescue nil
           @connection.close rescue nil
         end
-        @subscription_manager = nil
+        @dispatcher = nil
         @connection = nil
       end
 
@@ -169,9 +173,9 @@ module Protobuf
 
         if block
           handler = MessageHandlerProxy.new(&block)
-          sub = subscribe_using_subscription_manager(subject, queue, handler)
+          sub = subscribe_using_subscription_dispatcher(subject, queue, handler)
           # Auto unsub if max message option was provided.
-          subscription_manager.unsubscribe(sub, max) if max
+          dispatcher.unsubscribe(sub, max) if max
           sub
         else
           sub = subscribe_using_connection(subject, queue)
@@ -182,8 +186,8 @@ module Protobuf
 
       def unsubscribe(sub)
         return if sub.nil?
-        if sub.getSubscriptionManager
-          subscription_manager.unsubscribe(sub)
+        if sub.getDispatcher
+          dispatcher.unsubscribe(sub)
         else
           sub.unsubscribe()
         end
@@ -221,15 +225,15 @@ module Protobuf
         end
       end
 
-      def subscribe_using_subscription_manager(subject, queue, handler)
+      def subscribe_using_subscription_dispatcher(subject, queue, handler)
         if queue
-          subscription_manager.java_send(:subscribe,
-                                         [::Java::JavaLang::String, ::Java::JavaLang::String, ::Java::IoNatsClient::MessageHandler],
-                                         subject, queue, handler)
+          dispatcher.java_send(:subscribe,
+                               [::Java::JavaLang::String, ::Java::JavaLang::String, ::Java::IoNatsClient::MessageHandler],
+                               subject, queue, handler)
         else
-          subscription_manager.java_send(:subscribe,
-                                         [::Java::JavaLang::String, ::Java::IoNatsClient::MessageHandler],
-                                         subject, handler)
+          dispatcher.java_send(:subscribe,
+                               [::Java::JavaLang::String, ::Java::IoNatsClient::MessageHandler],
+                               subject, handler)
         end
       end
 
