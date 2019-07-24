@@ -7,3 +7,6 @@ rvm:
 before_install:
   - gem install bundler
   - gem update --system
+  - wget https://github.com/nats-io/gnatsd/releases/download/v1.3.0/gnatsd-v1.3.0-linux-amd64.zip
+  - unzip gnatsd-v1.3.0-linux-amd64.zip
+  - ./gnatsd-v1.3.0-linux-amd64/gnatsd &
