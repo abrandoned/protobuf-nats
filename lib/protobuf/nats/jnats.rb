@@ -3,13 +3,7 @@ ext_base = ::File.join(::File.dirname(__FILE__), '..', '..', '..', 'ext')
 require ::File.join(ext_base, "jars/slf4j-api-1.7.25.jar")
 require ::File.join(ext_base, "jars/slf4j-simple-1.7.25.jar")
 require ::File.join(ext_base, "jars/gson-2.6.2.jar")
-#require ::File.join(ext_base, "jars/jnats-1.1-SNAPSHOT.jar")
-require ::File.join(ext_base, "jars/jnats-2.5.2-SNAPSHOT.jar")
-
-# # Set field accessors so we can access the member variables directly.
-# class Java::IoNatsClient::SubscriptionImpl
-#   field_accessor :pMsgs, :pBytes, :delivered
-# end
+require ::File.join(ext_base, "jars/jnats-2.6.0.jar")
 
 module Protobuf
   module Nats
