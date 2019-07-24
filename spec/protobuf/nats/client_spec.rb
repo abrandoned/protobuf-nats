@@ -112,7 +112,7 @@ describe ::Protobuf::Nats::Client do
     let(:ack) { ::Protobuf::Nats::Messages::ACK }
     let(:nack) { ::Protobuf::Nats::Messages::NACK }
     let(:response) { "final count down" }
-    let(:subscription_inbox) { ::Protobuf::Nats::Client::SubscriptionInbox.new(double("sub", :is_valid => true), "INBOX") }
+    let(:subscription_inbox) { ::Protobuf::Nats::Client::SubscriptionInbox.new(double("sub", :is_active => true), "INBOX") }
 
     before do
       allow(::Protobuf::Nats).to receive(:client_nats_connection).and_return(client)
@@ -158,7 +158,7 @@ describe ::Protobuf::Nats::Client do
   end
 
   describe "#send_request" do
-    let(:subscription_inbox) { ::Protobuf::Nats::Client::SubscriptionInbox.new(double("sub", :is_valid => true), "INBOX") }
+    let(:subscription_inbox) { ::Protobuf::Nats::Client::SubscriptionInbox.new(double("sub", :is_active => true), "INBOX") }
 
     before do
       allow_any_instance_of(::Protobuf::Nats::Client).to receive(:new_subscription_inbox).and_return(subscription_inbox)
