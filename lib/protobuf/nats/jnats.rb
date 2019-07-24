@@ -209,28 +209,6 @@ module Protobuf
 
     private
 
-      def duration_in_ms(ms); ::Java::JavaTime::Duration.ofMillis(ms); end
-
-      def subscribe_using_connection(subject, queue)
-        if queue
-          connection.subscribe(subject, queue)
-        else
-          connection.subscribe(subject)
-        end
-      end
-
-      def subscribe_using_subscription_dispatcher(subject, queue, handler)
-        if queue
-          dispatcher.java_send(:subscribe,
-                               [::Java::JavaLang::String, ::Java::JavaLang::String, ::Java::IoNatsClient::MessageHandler],
-                               subject, queue, handler)
-        else
-          dispatcher.java_send(:subscribe,
-                               [::Java::JavaLang::String, ::Java::IoNatsClient::MessageHandler],
-                               subject, handler)
-        end
-      end
-
       # Jruby-openssl depends on bouncycastle so our lives don't suck super bad
       def read_pem_object_from_file(path)
         fail ::ArgumentError, "Tried to read a PEM key or cert with path nil" if path.nil?
@@ -273,6 +251,30 @@ module Protobuf
         context = javax.net.ssl.SSLContext.getInstance("TLSv1.2")
         context.init(key_manager.getKeyManagers, trust_manager.getTrustManagers, nil)
         context
+      end
+
+      def duration_in_ms(ms)
+        ::Java::JavaTime::Duration.ofMillis(ms)
+      end
+
+      def subscribe_using_connection(subject, queue)
+        if queue
+          connection.subscribe(subject, queue)
+        else
+          connection.subscribe(subject)
+        end
+      end
+
+      def subscribe_using_subscription_dispatcher(subject, queue, handler)
+        if queue
+          dispatcher.java_send(:subscribe,
+                               [::Java::JavaLang::String, ::Java::JavaLang::String, ::Java::IoNatsClient::MessageHandler],
+                               subject, queue, handler)
+        else
+          dispatcher.java_send(:subscribe,
+                               [::Java::JavaLang::String, ::Java::IoNatsClient::MessageHandler],
+                               subject, handler)
+        end
       end
     end
   end

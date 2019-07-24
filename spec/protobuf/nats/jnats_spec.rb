@@ -4,7 +4,7 @@ if defined?(JRUBY_VERSION)
   require "protobuf/nats/jnats"
 
   describe ::Protobuf::Nats::JNats do
-    describe "#subscribe" do
+    describe "#subscribe and #publish" do
       before { subject.connection }
       after { subject.close }
 
@@ -24,8 +24,40 @@ if defined?(JRUBY_VERSION)
         expected_data = ::SecureRandom.uuid
         sub = subject.subscribe("yolo.345")
         subject.publish("yolo.345", expected_data)
-        msg = subject.next_message(sub, 100)
+        msg = subject.next_message(sub, 0.1)
         expect(msg.data).to eq(expected_data)
+      end
+    end
+
+    describe "#next_message" do
+      before { subject.connection }
+      after { subject.close }
+
+      it "returns nil when a timeout has expired" do
+        sub = subject.subscribe("yolo.345")
+        msg = subject.next_message(sub, 0.1)
+        expect(msg).to be_nil
+      end
+    end
+
+    describe "#unsubscribe" do
+      before { subject.connection }
+      after { subject.close }
+
+      it "can unsub from an async subscription" do
+        # This verifies the dispatcher is called correctly.
+        async_sub = subject.subscribe("yolo.abc.async") {}
+        expect(async_sub.is_active).to eq(true)
+        subject.unsubscribe(async_sub)
+        expect(async_sub.is_active).to eq(false)
+      end
+
+      it "can unsub from a sync subscription" do
+        # This verifies the dispatcher is NOT called.
+        sub = subject.subscribe("yolo.abc.not_sync")
+        expect(sub.is_active).to eq(true)
+        subject.unsubscribe(sub)
+        expect(sub.is_active).to eq(false)
       end
     end
 
