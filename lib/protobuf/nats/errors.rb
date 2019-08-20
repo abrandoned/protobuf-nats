@@ -13,6 +13,15 @@ module Protobuf
       class MriIOException < ::StandardError
       end
 
+      class MriIllegalStateException < ::StandardError
+      end
+
+      IllegalStateException = if defined? JRUBY_VERSION
+                                java.lang.IllegalStateException
+                              else
+                                MriIllegalStateException
+                              end
+
       IOException = if defined? JRUBY_VERSION
                       java.io.IOException
                     else

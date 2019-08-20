@@ -165,11 +165,11 @@ module Protobuf
         end
 
         parse_response
-      rescue ::Protobuf::Nats::Errors::IOException => error
+      rescue ::Protobuf::Nats::Errors::IOException, ::Protobuf::Nats::Errors::IllegalStateException => error
         ::Protobuf::Nats.log_error(error)
 
         delay = reconnect_delay
-        logger.warn "An IOException was raised. We are going to sleep for #{delay} seconds."
+        logger.warn "An #{error.class} was raised. We are going to sleep for #{delay} seconds."
         sleep delay
 
         retry if (retries -= 1) > 0
@@ -207,7 +207,7 @@ module Protobuf
             begin
               completed_request = false
 
-              if !sub_inbox.subscription.is_valid # replace the subscription if is has been pooled but is no longer valid (maybe a reconnect)
+              if !sub_inbox.subscription.is_active # replace the subscription if is has been pooled but is no longer valid (maybe a reconnect)
                 nats.unsubscribe(sub_inbox.subscription)
                 sub_inbox.swap(new_subscription_inbox) # this line replaces the sub_inbox in the connection pool if necessary
               end
