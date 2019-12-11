@@ -151,12 +151,12 @@ module Protobuf
           when :ack_timeout
             ::ActiveSupport::Notifications.instrument "client.request_timeout.protobuf-nats"
             next if (retries -= 1) > 0
-            raise ::Protobuf::Nats::Errors::RequestTimeout
+            raise ::Protobuf::Nats::Errors::RequestTimeout, formatted_service_and_method_name
           when :nack
             ::ActiveSupport::Notifications.instrument "client.request_nack.protobuf-nats"
             interval = nack_backoff_intervals[nack_retry]
             nack_retry += 1
-            raise ::Protobuf::Nats::Errors::RequestTimeout if interval.nil?
+            raise ::Protobuf::Nats::Errors::RequestTimeout, formatted_service_and_method_name if interval.nil?
             sleep((interval + nack_backoff_splay)/1000.0)
             next
           end
@@ -184,6 +184,12 @@ module Protobuf
         method_name_cache[method_name] ||= begin
           ::Protobuf::Nats.subscription_key(klass, method_name)
         end
+      end
+
+      def formatted_service_and_method_name
+        klass = @options[:service]
+        method_name = @options[:method]
+        "#{klass}##{method_name}"
       end
 
       # The Java nats client offers better message queueing so we're going to use
@@ -231,7 +237,7 @@ module Protobuf
                          else return :ack_timeout
                          end
 
-              fail(::Protobuf::Nats::Errors::ResponseTimeout, subject) unless response
+              fail(::Protobuf::Nats::Errors::ResponseTimeout, formatted_service_and_method_name) unless response
 
               completed_request = true
               response
@@ -287,7 +293,7 @@ module Protobuf
                      else return :ack_timeout
                      end
 
-          fail(::Protobuf::Nats::Errors::ResponseTimeout, subject) unless response
+          fail(::Protobuf::Nats::Errors::ResponseTimeout, formatted_service_and_method_name) unless response
 
           response
         ensure
