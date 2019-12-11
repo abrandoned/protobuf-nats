@@ -1,5 +1,7 @@
 sudo: false
 language: ruby
+jdk:
+ - openjdk8
 rvm:
   - 2.3.0
   - jruby-9.1.7.0
