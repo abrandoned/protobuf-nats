@@ -1,13 +1,13 @@
 module Protobuf
   module Nats
     module Errors
-      class Base < ::StandardError
+      class ClientError < ::StandardError
       end
 
-      class RequestTimeout < Base
+      class RequestTimeout < ClientError
       end
 
-      class ResponseTimeout < Base
+      class ResponseTimeout < ClientError
       end
 
       class MriIOException < ::StandardError
