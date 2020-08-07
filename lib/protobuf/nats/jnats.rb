@@ -197,9 +197,6 @@ module Protobuf
               next unless callback
               callback.call(message.getData.to_s, message.getReplyTo, message.getSubject)
             rescue => error
-              puts(error)
-              puts(message)
-              puts(sub)
               @on_error_cb.call(error)
             end
           end
