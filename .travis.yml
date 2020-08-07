@@ -4,7 +4,9 @@ jdk:
  - openjdk8
 rvm:
   - 2.3.0
+  - 2.7.0
   - jruby-9.1.7.0
+  - jruby-9.2.13.0
 before_install:
-  - gem install bundler -v 1.14.3
+  - gem install bundler
   - gem update --system
