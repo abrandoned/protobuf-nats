@@ -79,9 +79,6 @@ if defined?(JRUBY_VERSION)
         expect(response.data).to eq("message2")
 
         # All done
-        # response = subject.next_message(sub, 1)
-        # puts(response)
-        # subject.unsubscribe(sub)
         expect(sub.isClosed).to eq(true)
       end
     end
