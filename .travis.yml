@@ -10,7 +10,7 @@ rvm:
 before_install:
   # Install and start gnatsd
   - ./scripts/install_gnatsd.sh
-  - $HOME/nats-server &
+  - $HOME/nats-server/nats-server &
   # Install deps for project
   - gem install bundler
   - gem update --system
