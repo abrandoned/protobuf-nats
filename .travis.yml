@@ -8,5 +8,9 @@ rvm:
   - jruby-9.1.7.0
   - jruby-9.2.13.0
 before_install:
+  # Install and start gnatsd
+  - ./scripts/install_gnatsd.sh
+  - $HOME/nats-server &
+  # Install deps for project
   - gem install bundler
   - gem update --system
