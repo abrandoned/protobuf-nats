@@ -5,11 +5,6 @@ require ::File.join(ext_base, "jars/slf4j-simple-1.7.25.jar")
 require ::File.join(ext_base, "jars/gson-2.6.2.jar")
 require ::File.join(ext_base, "jars/jnats-1.1-SNAPSHOT.jar")
 
-# Set field accessors so we can access the member variables directly.
-class Java::IoNatsClient::SubscriptionImpl
-  field_accessor :pMsgs, :pBytes, :delivered
-end
-
 module Protobuf
   module Nats
     class JNats
@@ -190,9 +185,9 @@ module Protobuf
               # We have to update the subscription stats so we're not considered a slow consumer.
               begin
                 sub.lock
-                sub.pMsgs -= 1
-                sub.pBytes -= message.getData.length if message.getData
-                sub.delivered += 1 unless sub.isClosed
+                sub.incrPMsgs(-1)
+                sub.incrPBytes(-message.getData.length) if message.getData
+                sub.incrDelivered(1) unless sub.isClosed
               ensure
                 sub.unlock
               end
