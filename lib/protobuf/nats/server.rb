@@ -213,6 +213,8 @@ module Protobuf
         logger.info "Waiting up to 60 seconds for the thread pool to finish shutting down..."
         thread_pool.shutdown
         thread_pool.wait_for_termination(60)
+        # Allow up to 5 seconds to flush the nats connection before disconnecting.
+        nats.flush(5)
       ensure
         @stopped = true
       end
