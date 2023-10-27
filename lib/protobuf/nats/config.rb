@@ -39,7 +39,7 @@ module Protobuf
             yaml_config = {}
             config_path = ENV["PROTOBUF_NATS_CONFIG_PATH"] || ::File.join("config", "protobuf_nats.yml")
             absolute_config_path = ::File.expand_path(config_path)
-            if ::File.exists?(absolute_config_path)
+            if ::File.exist?(absolute_config_path)
               # Psych 4 and newer requires unsafe_load_file in order for aliases to be used
               yaml_config = if ::YAML.respond_to?(:unsafe_load_file)
                 ::YAML.unsafe_load_file(absolute_config_path)[env]
